@@ -1,0 +1,20 @@
+# Vercel
+.vercel
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/*
+!.vscode/launch.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local / env (if you add later)
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,11 @@
+{
+  "name": "christen-site",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node -e \"process.exit(0)\""
+  }
+}

@@ -1,0 +1,7 @@
+# Vercel 部署时忽略（不影响网站运行）
+.vercel
+.git
+.vscode
+*.log
+.env
+.env.*

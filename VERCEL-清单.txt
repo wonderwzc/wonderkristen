@@ -1,0 +1,33 @@
+========================================
+  Vercel 部署清单 — 确保这些都在仓库里
+========================================
+
+【必须有的文件/文件夹】（缺一不可）
+  ✓ index.html          （网站首页）
+  ✓ style.css           （样式）
+  ✓ script.js            （逻辑）
+  ✓ vercel.json         （Vercel 配置）
+  ✓ package.json        （构建配置，含 build 脚本）
+  ✓ bg-music-embed.js   （首页引用）
+  ✓ olib/               （整个文件夹，书籍板块用）
+
+【建议有】（没有也能部署，但效果不完整）
+  • kw-logo.png         （顶栏 logo、网站图标，没有会显示缺失）
+  • bg-music.mp3        （背景音乐，没有则静音）
+
+【.gitignore 不能忽略】
+  • 不要忽略 olib/
+  • 不要忽略 index.html、style.css、script.js、vercel.json、package.json
+
+【Vercel 项目设置】
+  Settings → Build & Development Settings：
+  • Framework Preset：Other
+  • Build Command：留空或 npm run build（与 vercel.json 一致）
+  • Output Directory：.
+  • Install Command：留空或 npm install
+  • Root Directory：若仓库根就是上述文件，留空
+
+【部署流程】
+  1. 把本文件夹全部内容推送到 GitHub 的 main 分支
+  2. Vercel 连接该仓库后会自动部署，或手动 Redeploy
+  3. 部署状态变为 Ready 后，Promote to Production

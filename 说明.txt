@@ -1,0 +1,28 @@
+克丽斯腾个人站 — 你现在可以这样做
+========================================
+
+一、只在电脑上看效果
+    双击 index.html，用浏览器打开即可。不用装任何东西。
+
+二、想放到网上给别人访问（选一种就行）
+
+  方式 1：Gitee 码云 + Gitee Pages（国内，访问快）
+    1. 打开 https://gitee.com 注册账号
+    2. 新建仓库，把「克丽斯腾」文件夹里所有东西上传进去（页面上有「上传文件」）
+    3. 仓库里点「服务」→「Gitee Pages」→ 开启
+    4. 等一会儿会给你一个地址，用这个地址就能访问你的站
+
+  方式 2：GitHub + Vercel（国外，需能访问 GitHub）
+    1. 打开 https://github.com 注册账号
+    2. 新建仓库，把本文件夹全部内容推送上去（需先装 Git，或用 GitHub 网页上传）
+    3. 打开 https://vercel.com 用 GitHub 登录，New Project 选这个仓库，Framework 选 Other，Deploy
+    4. 部署完会给你一个 xxx.vercel.app 的链接
+
+  若 Vercel 提示「没有 production deployment」或部署全是失败：
+    1. 本文件夹已加 package.json、vercel.json 已改为空构建，请把最新代码推送到 GitHub。
+    2. 在 Vercel 项目里：Settings → General → Build & Development Settings →
+       Framework Preset 选 Other，Build Command 和 Install Command 都留空，Output Directory 填一个点 .
+    3. 保存后点 Deployments → 右上角 Redeploy，或再推送一次代码触发部署。
+    4. 部署状态变成 Ready 后，点该部署右侧 ⋮ → Promote to Production。
+
+不想折腾的话：用方式 1（Gitee），国内打开快、步骤少。
