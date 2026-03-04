@@ -1,0 +1,82 @@
+================================================================================
+  生成 APK — 在手机端安装使用
+================================================================================
+
+一、APK 是什么
+--------------
+APK 即 Android 安装包。本说明用于把「克丽斯腾」站点打成 APK，安装到安卓手机后像普通 App 一样使用（内含站点 + 书籍/Olib）。
+
+
+二、首次准备（需做一次）
+------------------------
+1. 安装 Node.js（建议 18+）
+   https://nodejs.org/
+
+2. 安装 Android 开发环境（二选一）：
+   (A) 安装 Android Studio：https://developer.android.com/studio
+       安装时勾选 Android SDK、Android SDK Platform，并确认环境变量中已设置 ANDROID_HOME（通常 Android Studio 会提示配置）。
+   (B) 仅命令行：安装 Android SDK 与 build-tools，并设置 ANDROID_HOME。
+
+3. 在项目根目录（克丽斯腾 文件夹）执行：
+   npm install
+   若已执行过可跳过。
+
+
+三、生成 APK 的两种方式
+-----------------------
+
+方式一：一条命令生成 Debug APK（推荐）
+   npm run cap:build-apk
+
+   说明：
+   • 会先执行 node copy-to-www.js（把站点文件复制到 www）
+   • 再执行 cap sync android（同步到 Android 工程）
+   • 最后在 android 目录执行 Gradle 构建。
+   • 首次构建会下载 Gradle 与依赖，可能需 5～15 分钟，请保持网络畅通。
+   • 生成完成后，APK 位于：
+     android\app\build\outputs\apk\debug\app-debug.apk
+   • 将 app-debug.apk 传到手机安装即可（若浏览器提示「未知来源」，需在系统设置中允许该来源安装应用）。
+
+方式二：分步执行（便于排查问题）
+   1) 复制站点到 www：  npm run cap:copy
+   2) 同步到 Android：   npx cap sync android
+   3) 进入 Android 目录： cd android
+   4) 构建 Debug APK：   gradlew.bat assembleDebug   （Windows）
+                        或  ./gradlew assembleDebug  （Mac/Linux）
+   APK 输出路径同上：android\app\build\outputs\apk\debug\app-debug.apk
+
+
+四、用 Android Studio 构建（可选）
+---------------------------------
+若已安装 Android Studio，可打开 Android 工程后由 IDE 构建：
+   1) 执行一次：npm run cap:copy && npx cap sync android
+   2) 用 Android Studio 打开项目下的 android 文件夹
+   3) 菜单 Build → Build Bundle(s) / APK(s) → Build APK(s)
+   4) 构建完成后可点 Locate 找到 APK，或到 android\app\build\outputs\apk\debug\ 查看。
+
+
+五、Release 签名 APK（上架或正式分发）
+--------------------------------------
+Debug APK 可直接安装使用。若需要签名后的 Release APK：
+   1) 在 Android Studio 中打开 android 工程
+   2) Build → Generate Signed Bundle / APK → APK → 选择或创建 keystore，按向导完成
+   3) 或自行配置 android/app/build.gradle 的 signingConfigs 后执行：
+      gradlew.bat assembleRelease
+   Release APK 输出在 android\app\build\outputs\apk\release\。
+
+
+六、常见问题
+------------
+Q：执行 cap:build-apk 时报错找不到 gradlew？
+A：确认在项目根目录执行，且 android 文件夹存在；若 android 不存在，先执行：npx cap add android
+
+Q：首次构建很慢？
+A：首次会下载 Gradle 与 Android 依赖，属正常现象，请耐心等待。
+
+Q：APK 安装后打开白屏？
+A：确认 www 内已有 index.html、style.css、script.js 及 olib 等；重新执行 npm run cap:copy 后再次 npx cap sync android 并重新打 APK。
+
+Q：能否不装 Android Studio 只打 APK？
+A：可以。只要本机已安装 Android SDK 并配置好 ANDROID_HOME，在项目根目录执行 npm run cap:build-apk 即可用命令行打出 Debug APK。
+
+================================================================================

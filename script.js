@@ -1,7 +1,15 @@
 document.addEventListener("DOMContentLoaded", () => {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => {});
+  }
+
   const header = document.querySelector(".site-header");
   const body = document.body;
   const HEADER_SCROLL_THRESHOLD = 60;
+  /** 同步文件夹句柄（选择后本会话有效）；板块数据变更时自动写入对应文件 */
+  let syncDirHandle = null;
+  /** 板块数据变更回调，由同步 UI 初始化时注册，用于按板块自动保存到同步文件夹 */
+  let onSectionDataChanged = null;
 
   const throttle = (fn, ms) => {
     let last = 0;
@@ -10,6 +18,23 @@ document.addEventListener("DOMContentLoaded", () => {
       if (now - last >= ms) {
         last = now;
         fn.apply(null, args);
+      }
+    };
+  };
+  /** 滚动/resize 等高频事件：先节流再在 rAF 内执行，避免布局抖动，移动端更丝滑 */
+  const throttleRAF = (fn, ms) => {
+    let rafId = 0;
+    let last = 0;
+    const run = (...args) => {
+      rafId = 0;
+      fn.apply(null, args);
+    };
+    return (...args) => {
+      const now = Date.now();
+      if (now - last >= ms) {
+        last = now;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => run(...args));
       }
     };
   };
@@ -40,19 +65,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const nextMuted = !bgMusic.muted;
       bgMusic.muted = nextMuted;
       bgMusicToggle.classList.toggle("is-muted", nextMuted);
+      const drawerMusic = document.getElementById("mobile-drawer-music");
+      if (drawerMusic) drawerMusic.classList.toggle("is-muted", nextMuted);
       localStorage.setItem(BG_MUSIC_MUTED_KEY, nextMuted ? "1" : "0");
       if (!nextMuted) bgMusic.play().catch(() => {});
     });
   }
-
-  const updateHeaderScroll = throttle(() => {
+  const updateHeaderScroll = throttleRAF(() => {
     if (!header) return;
     if (window.scrollY > HEADER_SCROLL_THRESHOLD) {
       header.classList.add("is-scrolled");
     } else {
       header.classList.remove("is-scrolled");
     }
-  }, 80);
+  }, 64);
   window.addEventListener("scroll", updateHeaderScroll, { passive: true });
   updateHeaderScroll();
 
@@ -80,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
         backToTopBtn.setAttribute("hidden", "");
       }
     };
-    const onBackToTopTick = throttle(updateBackToTopVisible, 120);
+    const onBackToTopTick = throttleRAF(updateBackToTopVisible, 100);
     window.addEventListener("scroll", onBackToTopTick, { passive: true });
     window.addEventListener("resize", onBackToTopTick);
     updateBackToTopVisible();
@@ -109,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
         goToBottomBtn.removeAttribute("hidden");
       }
     };
-    const onGoToBottomTick = throttle(updateGoToBottomVisible, 120);
+    const onGoToBottomTick = throttleRAF(updateGoToBottomVisible, 100);
     window.addEventListener("scroll", onGoToBottomTick, { passive: true });
     window.addEventListener("resize", onGoToBottomTick);
     updateGoToBottomVisible();
@@ -165,16 +191,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!listEl) return;
     const theme = getThemeToApply();
     listEl.innerHTML = "";
+    const t = (typeof getLang === "function" && typeof I18N === "object") ? (I18N[getLang()] || I18N.zh) : {};
     THEME_ITEMS.forEach((item) => {
       const row = document.createElement("div");
       row.className = "footer-theme-row";
       const label = document.createElement("label");
-      label.textContent = item.label;
+      const labelText = (t["theme.label." + item.key] != null ? t["theme.label." + item.key] : item.label);
+      label.textContent = labelText;
       const input = document.createElement("input");
       input.type = "color";
       input.value = theme[item.key] || item.default;
       input.dataset.themeKey = item.key;
-      input.setAttribute("aria-label", item.label);
+      input.setAttribute("aria-label", labelText);
       input.addEventListener("input", () => {
         const next = getThemeToApply();
         next[item.key] = input.value;
@@ -196,7 +224,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   applyTheme(getThemeToApply());
-  renderThemeList();
 
   (function initGalaxyBars() {
     const headerGalaxy = document.getElementById("header-galaxy-stars");
@@ -302,6 +329,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const themeTrigger = document.getElementById("theme-trigger-btn");
   const themeWrap = document.querySelector(".footer-theme-wrap");
   const themePanel = document.getElementById("theme-panel");
+  const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
+  const closeThemePanel = () => {
+    themeWrap.classList.remove("is-open");
+    themeTrigger.setAttribute("aria-expanded", "false");
+    themePanel.hidden = true;
+    themePanel.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("theme-panel-open");
+    if (isMobile() && themeWrap.parentElement) themeWrap.appendChild(themePanel);
+  };
   if (themeTrigger && themeWrap && themePanel) {
     themeTrigger.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -310,15 +346,16 @@ document.addEventListener("DOMContentLoaded", () => {
       themePanel.hidden = !isOpen;
       themePanel.setAttribute("aria-hidden", isOpen ? "false" : "true");
       document.body.classList.toggle("theme-panel-open", isOpen);
+      if (isMobile()) {
+        if (isOpen) document.body.appendChild(themePanel);
+        else themeWrap.appendChild(themePanel);
+      }
     });
     document.addEventListener("click", (e) => {
       if (!themeWrap.classList.contains("is-open")) return;
-      if (themeWrap.contains(e.target) || themeTrigger.contains(e.target)) return;
-      themeWrap.classList.remove("is-open");
-      themeTrigger.setAttribute("aria-expanded", "false");
-      themePanel.hidden = true;
-      themePanel.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("theme-panel-open");
+      if (themeWrap.contains(e.target) || themeTrigger.contains(e.target) || themePanel.contains(e.target)) return;
+      if (e.target.id === "mobile-drawer-theme-btn" || e.target.closest("#mobile-drawer-theme-btn")) return;
+      closeThemePanel();
     });
     themePanel.addEventListener("click", (e) => e.stopPropagation());
   }
@@ -354,10 +391,13 @@ document.addEventListener("DOMContentLoaded", () => {
       "nav.voice": "文本台词",
       "nav.fanworks": "同人创作",
       "nav.moments": "随笔记录",
+      "nav.references": "参考文献",
       "nav.books": "书籍",
       "nav.links": "相关链接",
+      "site.title": "克丽斯腾·莱特｜个人站",
+      "a11y.skipToMain": "跳至主内容",
       "section.hero": "首屏",
-      "section.hero.desc": "这里将展示首屏区域内容的图片主视觉效果。",
+      "section.hero.desc": "设置首屏主视觉图片与文案，支持多图轮播。可更换页面背景与站点图标。",
       "hero.customArea": "自定义本区域",
       "hero.changeBg": "更换页面背景",
       "hero.bgTitle": "更换页面背景",
@@ -370,7 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "hero.editDesc": "更改说明",
       "hero.delete": "删除",
       "section.about": "角色简介",
-      "section.about.desc": "在这里填写出身、种族、所属、身份等基础信息。",
+      "section.about.desc": "填写角色的名字、出身、种族与阵营等基础信息，并上传头像。点击卡片可展开编辑。",
       "section.about.basic": "基础信息",
       "section.about.name": "名字",
       "section.about.relations": "人物关系",
@@ -385,26 +425,48 @@ document.addEventListener("DOMContentLoaded", () => {
       "section.about.relations.to": "至",
       "section.about.relations.relationLabel": "关系说明",
       "section.story": "背景故事",
-      "section.story.desc": "可按时间线或主题分段展示：早期经历、莱茵生命、总辖之路、孤星事件等。",
+      "section.story.desc": "按时间线或主题分段撰写背景故事，支持标题、创作者与简介，可上传配图。",
       "section.gallery": "立绘 / 插图",
-      "section.gallery.desc": "图片画廊占位：未来可替换为立绘、皮肤、CG 等。",
+      "section.gallery.desc": "上传并管理立绘、皮肤或 CG 等图片，填写标题与说明后即可在展示区浏览。",
       "section.voice": "文本台词",
-      "section.voice.desc": "此处展示角色相关的文本台词内容，可按场景或触发条件分类整理。",
+      "section.voice.desc": "整理角色相关的台词与文本，按场景或触发条件分类，便于查阅与展示。",
       "section.fanworks": "同人创作",
       "section.moments": "随笔记录",
+      "section.references": "参考文献",
+      "references.overview": "管理参考文献（Zotero 风格），支持作者、标题、年份、链接与备注，在文献检索区浏览与检索。",
+      "refs.formTitle": "添加参考文献",
+      "refs.author": "作者",
+      "refs.title": "标题",
+      "refs.year": "年份",
+      "refs.url": "链接",
+      "refs.note": "备注",
+      "refs.addRef": "添加引用",
       "section.books": "书籍",
-      "section.books.desc": "Olib 电子书：搜索、阅读与收藏电子书，支持多线路与在线阅读。",
+      "section.books.desc": "集成 Olib 电子书：搜索、在线阅读与收藏，支持多线路访问。",
       "books.openInNew": "在新页面打开 Olib",
       "books.hint": "需通过已部署网址访问（如 Vercel），勿直接打开本地 HTML 文件。",
+      "books.loading": "正在加载 Olib 电子书…",
+      "books.noFlutter": "当前未配置 Olib 电子书，本站其他板块可正常使用。若需书籍功能，请按「Olib融合说明」构建 Olib 网页版（需 Flutter），或直接使用已部署站点。",
       "section.links": "相关链接",
-      "moments.overview": "记录每日文本灵感，类似说说动态。可写内容、加表情，支持点赞与评论。",
+      "moments.overview": "发布短句与灵感，类似动态。支持日期、内容与表情，可点赞与评论。",
       "moments.publish": "发一条说说",
+      "moments.noteTitle": "笔记标题（可选）",
+      "moments.noteTitlePh": "输入标题",
       "moments.date": "日期",
       "moments.dateTime": "日期时间",
       "moments.uploadImage": "上传图片",
       "moments.content": "内容",
       "moments.contentPh": "写下此刻灵感…",
       "moments.emoji": "表情",
+      "moments.refsTitle": "参考文献（Zotero 风格，可选）",
+      "moments.addRef": "添加引用",
+      "moments.refAuthor": "作者",
+      "moments.refTitle": "标题",
+      "moments.refYear": "年份",
+      "moments.refUrl": "链接",
+      "moments.refNote": "备注",
+      "moments.refsHeading": "参考文献",
+      "moments.delRef": "删除",
       "moments.publishBtn": "发布",
       "moments.like": "赞",
       "moments.comment": "评论",
@@ -431,10 +493,11 @@ document.addEventListener("DOMContentLoaded", () => {
       "fanworks.note": "※ 当前展示区仅示例，实际作品由站长审核后添加。",
       "fanworks.display": "同人创作展示区",
       "fanworks.displayDesc": "站长精选收录的插画、短文、音声等作品会在这里集中展示。",
-      "fanworks.overview": "这里用于收录与展示其他创作者对克丽斯腾的二创作品。点击进入可投稿、浏览展示区，或按需装扮成自己的站点。",
-      "detail.back": "← 返回总览",
+      "fanworks.overview": "收录并展示其他创作者的二创作品。进入后可投稿、浏览展示区，或自定义版面样式。",
+      "detail.back": "返回总览",
+      "detail.backTitle": "返回总览（Esc）",
       "detail.title": "板块详情",
-      "detail.subtitle": "此处为该板块的完整内容区域。",
+      "detail.subtitle": "在此填写或管理本板块内容，下方为已提交的展示列表。",
       "detail.placeholder": "点击上方任意板块进入后，可在此展示该板块的详细内容。",
       "detail.uploadHint": "本板块可在此展示/编辑内容；可直接在页面上提交文字、链接、图片，装扮成属于自己的站点，无需改代码。",
       "detail.avatar": "头像",
@@ -463,17 +526,61 @@ document.addEventListener("DOMContentLoaded", () => {
       "detail.filterClear": "清除筛选",
       "detail.importExport": "一键导入/导出",
       "detail.importFromClipboard": "从剪贴板导入",
+      "detail.importFromFile": "从文件导入",
       "detail.exportData": "导出当前数据",
+      "detail.exportJson": "导出 JSON",
       "detail.exportPdf": "导出为 PDF",
       "detail.exportPdfA4": "导出为 PDF（多页 A4）",
       "detail.exportPdfLong": "导出为 PDF（单页长图）",
       "detail.importExportHint": "复制好内容后点击「从剪贴板导入」即可导入；导出将生成当前站点信息的 PDF 文件。",
+      "detail.syncHint": "电脑端选择一次同步根目录后，每个板块对应一个独立子文件夹，文件夹内仅存该板块的 data.json，编辑后自动同步。手机端用「从文件导入」与「导出 JSON」。多设备请勿同时编辑。",
+      "detail.syncFolderTitle": "同步盘（电脑端）",
+      "detail.syncPickFolder": "选择同步文件夹",
+      "detail.syncRead": "从同步文件夹读取",
+      "detail.syncSave": "保存到同步文件夹",
+      "detail.syncFolderPicked": "已选择同步文件夹",
+      "detail.syncPickFirst": "请先点击「选择同步文件夹」",
+      "detail.syncFileNotFound": "同步文件夹内未找到数据文件",
       "detail.importSuccess": "导入成功",
       "detail.importFail": "导入失败",
       "detail.exportSuccess": "已导出",
+      "theme.trigger": "界面配色",
       "theme.starsToggle": "星星特效",
       "theme.starsOff": "关闭",
       "theme.starsOn": "开启",
+      "theme.reset": "恢复默认",
+      "links.prts": "PRTS Wiki",
+      "form.workTitle": "作品标题",
+      "form.creatorMeta": "创作者 / 标签",
+      "form.desc": "简介 / 描述",
+      "form.fileOptional": "上传文件（可选）",
+      "form.submitBtn": "提交",
+      "detail.customFieldsTitle": "自定义基础信息栏目（可选）",
+      "detail.customFieldsHint": "可添加多个自定义栏目，不填不影响提交。",
+      "detail.addField": "添加栏目",
+      "a11y.openMenu": "打开菜单",
+      "a11y.closeMenu": "关闭菜单",
+      "a11y.collapseHeader": "收起顶栏",
+      "a11y.expandHeader": "展开顶栏",
+      "a11y.collapseSection": "收起本区域",
+      "a11y.collapseHero": "收起首屏",
+      "a11y.expandHero": "展开首屏",
+      "a11y.editName": "更改名字",
+      "a11y.theme": "界面配色",
+      "a11y.bgMusic": "背景音乐开关",
+      "a11y.langToggle": "切换语言：中文 ⇄ English",
+      "a11y.langToggleBtn": "中文 / English",
+      "theme.label.pageBg": "页面背景",
+      "theme.label.header": "顶栏",
+      "theme.label.headerBtn": "顶栏按钮",
+      "theme.label.hero": "首屏区",
+      "theme.label.section": "板块区域",
+      "theme.label.sectionBtn": "板块按钮",
+      "theme.label.footer": "底栏",
+      "theme.label.footerBtn": "底栏按钮",
+      "theme.label.detailBtn": "板块内容按钮",
+      "theme.label.star": "星星特效",
+      "theme.label.galaxy": "银河特效",
       footer: "自建站 · 非商用 · 所有版权归原著作权人所有",
     },
     en: {
@@ -492,10 +599,13 @@ document.addEventListener("DOMContentLoaded", () => {
       "nav.voice": "Lines",
       "nav.fanworks": "Fanworks",
       "nav.moments": "Moments",
+      "nav.references": "References",
       "nav.books": "Books",
       "nav.links": "Links",
+      "site.title": "Kristen Wright | Site",
+      "a11y.skipToMain": "Skip to main content",
       "section.hero": "Hero",
-      "section.hero.desc": "Here, the main visual images of the hero area will be displayed.",
+      "section.hero.desc": "Set the hero image and copy; supports multiple images. Change page background and site icon here.",
       "hero.customArea": "Customize This Area",
       "hero.changeBg": "Change Page Background",
       "hero.bgTitle": "Change Page Background",
@@ -508,7 +618,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "hero.editDesc": "Edit description",
       "hero.delete": "Delete",
       "section.about": "Profile",
-      "section.about.desc": "Fill in origin, race, affiliation, identity and other basic info here.",
+      "section.about.desc": "Add name, origin, race and affiliation; upload an avatar. Tap a card to expand and edit.",
       "section.about.basic": "Basic Info",
       "section.about.name": "Name",
       "section.about.relations": "Relations",
@@ -523,26 +633,48 @@ document.addEventListener("DOMContentLoaded", () => {
       "section.about.relations.to": "To",
       "section.about.relations.relationLabel": "Relationship",
       "section.story": "Story",
-      "section.story.desc": "Display by timeline or theme: early life, Rhine Lab, path to Director, Lone Trail, etc.",
+      "section.story.desc": "Write story entries by timeline or theme; add title, creator, description and images.",
       "section.gallery": "Gallery / Art",
-      "section.gallery.desc": "Image gallery placeholder for illustrations, skins, CGs, etc.",
+      "section.gallery.desc": "Upload and manage art, skins or CGs; add title and description to show in the gallery.",
       "section.voice": "Lines",
-      "section.voice.desc": "Character text lines; organize by scenario or trigger.",
+      "section.voice.desc": "Organize character lines and text by scenario or trigger for easy browsing.",
       "section.fanworks": "Fanworks",
       "section.moments": "Moments",
+      "section.references": "References",
+      "references.overview": "Manage references (Zotero-style) with author, title, year, URL and notes; browse in the references area.",
+      "refs.formTitle": "Add reference",
+      "refs.author": "Author",
+      "refs.title": "Title",
+      "refs.year": "Year",
+      "refs.url": "URL",
+      "refs.note": "Note",
+      "refs.addRef": "Add citation",
       "section.books": "Books",
-      "section.books.desc": "Olib ebooks: search, read and collect ebooks, with multi-line support and online reading.",
+      "section.books.desc": "Olib ebooks: search, read online and collect; supports multiple access routes.",
       "books.openInNew": "Open Olib in new page",
       "books.hint": "Use a deployed URL (e.g. Vercel); do not open local HTML files directly.",
+      "books.loading": "Loading Olib ebooks…",
+      "books.noFlutter": "Olib ebooks are not configured here; other sections work as usual. To enable books, build the Olib web app (requires Flutter) per Olib fusion guide, or use a deployed site.",
       "section.links": "Links",
-      "moments.overview": "Daily text inspirations like a feed. Add content, emoji, with like and comment.",
+      "moments.overview": "Post short updates and inspiration like a feed. Add date, content and emoji; like and comment.",
       "moments.publish": "Post a moment",
+      "moments.noteTitle": "Note title (optional)",
+      "moments.noteTitlePh": "Enter title",
       "moments.date": "Date",
       "moments.dateTime": "Date & time",
       "moments.uploadImage": "Upload image",
       "moments.content": "Content",
       "moments.contentPh": "Write your thought…",
       "moments.emoji": "Emoji",
+      "moments.refsTitle": "References (Zotero-style, optional)",
+      "moments.addRef": "Add citation",
+      "moments.refAuthor": "Author",
+      "moments.refTitle": "Title",
+      "moments.refYear": "Year",
+      "moments.refUrl": "URL",
+      "moments.refNote": "Note",
+      "moments.refsHeading": "References",
+      "moments.delRef": "Remove",
       "moments.publishBtn": "Publish",
       "moments.like": "Like",
       "moments.comment": "Comment",
@@ -569,10 +701,11 @@ document.addEventListener("DOMContentLoaded", () => {
       "fanworks.note": "Display area is for demo; entries are added after review.",
       "fanworks.display": "Fanworks Gallery",
       "fanworks.displayDesc": "Curated fan art, fic, audio, etc. are displayed here.",
-      "fanworks.overview": "Fan-created works for Kristen are collected here. Enter to submit, browse the gallery, or customize this space as your own.",
-      "detail.back": "← Back to Overview",
+      "fanworks.overview": "Browse and submit fanworks. Enter to contribute, view the gallery, or customize the layout.",
+      "detail.back": "Back to Overview",
+      "detail.backTitle": "Back to Overview (Esc)",
       "detail.title": "Section Detail",
-      "detail.subtitle": "Full content for this section is shown here.",
+      "detail.subtitle": "Add or manage content here; your submissions are listed below.",
       "detail.placeholder": "Click any section above to open its detail view here.",
       "detail.uploadHint": "This section can display/edit content here; submit text, links, and images directly on the page to make it your own—no code required.",
       "detail.avatar": "Avatar",
@@ -601,38 +734,116 @@ document.addEventListener("DOMContentLoaded", () => {
       "detail.filterClear": "Clear filter",
       "detail.importExport": "Import / Export",
       "detail.importFromClipboard": "Import from clipboard",
+      "detail.importFromFile": "Import from file",
       "detail.exportData": "Export data",
+      "detail.exportJson": "Export JSON",
       "detail.exportPdf": "Export as PDF",
       "detail.exportPdfA4": "Export as PDF (multi-page A4)",
       "detail.exportPdfLong": "Export as PDF (single long page)",
       "detail.importExportHint": "Paste your content, then click the import button; export generates a PDF of the current site.",
+      "detail.syncHint": "On desktop, pick a sync root once; each section has its own subfolder with only that section's data.json, auto-syncs after edits. On mobile, use Import from file and Export JSON. Avoid editing on two devices at once.",
+      "detail.syncFolderTitle": "Sync folder (desktop)",
+      "detail.syncPickFolder": "Choose sync folder",
+      "detail.syncRead": "Read from sync folder",
+      "detail.syncSave": "Save to sync folder",
+      "detail.syncFolderPicked": "Sync folder selected",
+      "detail.syncPickFirst": "Please click «Choose sync folder» first",
+      "detail.syncFileNotFound": "Data file not found in sync folder",
       "detail.importSuccess": "Import successful",
       "detail.importFail": "Import failed",
       "detail.exportSuccess": "Exported",
+      "theme.trigger": "Theme",
       "theme.starsToggle": "Star effect",
       "theme.starsOff": "Off",
       "theme.starsOn": "On",
+      "theme.reset": "Reset default",
+      "links.prts": "PRTS Wiki",
+      "form.workTitle": "Work title",
+      "form.creatorMeta": "Creator / tags",
+      "form.desc": "Description",
+      "form.fileOptional": "Upload file (optional)",
+      "form.submitBtn": "Submit",
+      "detail.customFieldsTitle": "Custom basic fields (optional)",
+      "detail.customFieldsHint": "You can add multiple custom fields; leaving them empty does not affect submission.",
+      "detail.addField": "Add field",
+      "a11y.openMenu": "Open menu",
+      "a11y.closeMenu": "Close menu",
+      "a11y.collapseHeader": "Collapse header",
+      "a11y.expandHeader": "Expand header",
+      "a11y.collapseSection": "Collapse section",
+      "a11y.collapseHero": "Collapse hero",
+      "a11y.expandHero": "Expand hero",
+      "a11y.editName": "Edit name",
+      "a11y.theme": "Theme",
+      "a11y.bgMusic": "Background music",
+      "a11y.langToggle": "Switch language: 中文 ⇄ English",
+      "a11y.langToggleBtn": "EN / 中文",
+      "theme.label.pageBg": "Page background",
+      "theme.label.header": "Header",
+      "theme.label.headerBtn": "Header buttons",
+      "theme.label.hero": "Hero area",
+      "theme.label.section": "Section area",
+      "theme.label.sectionBtn": "Section buttons",
+      "theme.label.footer": "Footer",
+      "theme.label.footerBtn": "Footer buttons",
+      "theme.label.detailBtn": "Detail buttons",
+      "theme.label.star": "Star effect",
+      "theme.label.galaxy": "Galaxy effect",
       footer: "Fan site · Non-commercial · All rights to original authors.",
     },
   };
 
+  /** 统一根据翻译包切换整站语言；无论何时何地点击切换都会应用当前语言的翻译包到全部界面（含动态内容） */
   const applyLangToPage = (lang) => {
-    const t = I18N[lang] || I18N.zh;
+    setLang(lang);
+    const pack = I18N[lang] || I18N.zh;
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      if (t[key] != null) el.textContent = t[key];
+      if (pack[key] != null) el.textContent = pack[key];
     });
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-i18n-placeholder");
-      if (t[key] != null) el.placeholder = t[key];
+      if (pack[key] != null) el.placeholder = pack[key];
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-aria");
+      if (pack[key] != null) el.setAttribute("aria-label", pack[key]);
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-title");
+      if (pack[key] != null) el.setAttribute("title", pack[key]);
     });
     const starsBtn = document.getElementById("theme-stars-toggle-btn");
     if (starsBtn) {
       const disabled = localStorage.getItem("site-stars-disabled") === "1";
-      starsBtn.textContent = disabled ? (t["theme.starsOn"] || "开启") : (t["theme.starsOff"] || "关闭");
+      starsBtn.textContent = disabled ? (pack["theme.starsOn"] || "开启") : (pack["theme.starsOff"] || "关闭");
       starsBtn.setAttribute("aria-pressed", disabled ? "true" : "false");
     }
+    document.documentElement.lang = lang === "en" ? "en" : "zh-CN";
+    document.title = pack["site.title"] != null ? pack["site.title"] : (lang === "en" ? "Kristen Wright | Site" : "克丽斯腾·莱特｜个人站");
+    const dv = document.getElementById("detail-view");
+    const db = dv ? dv.querySelector(".detail-body") : null;
+    const sectionId = dv && !dv.hidden ? dv.dataset.currentSectionId : null;
+    if (dv && !dv.hidden && db) {
+      const section = sectionId ? document.getElementById(sectionId) : null;
+      if (section) {
+        const titleEl = section.querySelector("h2");
+        const descEl = section.querySelector("p");
+        const titleNode = db.querySelector(".detail-title");
+        const subtitleNode = db.querySelector(".detail-subtitle");
+        if (titleNode && titleEl) titleNode.textContent = titleEl.textContent;
+        if (subtitleNode && descEl) subtitleNode.textContent = descEl.textContent;
+      }
+    }
+    if (typeof renderThemeList === "function") renderThemeList();
+    if (sectionId && typeof applyDetailConfig === "function") {
+      applyDetailConfig(sectionId);
+      if (typeof renderDisplayList === "function") renderDisplayList(sectionId);
+    }
   };
+
+  /** 根据当前语言从翻译包取文案，供任意位置使用 */
+  const t = (key) => (I18N[getLang()] || I18N.zh)[key] || key;
 
   const CUSTOM_HEADER_TAG_KEY = "custom-header-tag";
   const CUSTOM_HEADER_NAME_KEY = "custom-header-name";
@@ -645,14 +856,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const tag = localStorage.getItem(CUSTOM_HEADER_TAG_KEY);
     const name = localStorage.getItem(CUSTOM_HEADER_NAME_KEY);
     const subtitle = localStorage.getItem(CUSTOM_HEADER_SUBTITLE_KEY);
-    if (tagEl) tagEl.textContent = (tag && tag.trim()) ? tag.trim() : (t["header.tag"] || "");
-    if (nameEl) nameEl.textContent = (name && name.trim()) ? name.trim() : (t["header.name"] || "");
-    if (subtitleEl) subtitleEl.textContent = (subtitle && subtitle.trim()) ? subtitle.trim() : (t["header.subtitle"] || "");
+    const str = (v) => (v && String(v).trim()) ? String(v).trim() : "";
+    const tagStr = str(tag) || (t["header.tag"] || "");
+    const nameStr = str(name) || (t["header.name"] || "");
+    const subtitleStr = str(subtitle) || (t["header.subtitle"] || "");
+    if (tagEl) tagEl.textContent = tagStr;
+    if (nameEl) nameEl.textContent = nameStr;
+    if (subtitleEl) subtitleEl.textContent = subtitleStr;
+    const drawerTag = document.getElementById("mobile-drawer-tag");
+    const drawerName = document.getElementById("mobile-drawer-name");
+    const drawerSubtitle = document.getElementById("mobile-drawer-subtitle");
+    if (drawerTag) drawerTag.textContent = tagStr;
+    if (drawerName) drawerName.textContent = nameStr;
+    if (drawerSubtitle) drawerSubtitle.textContent = subtitleStr;
   };
 
+  const drawerNavItems = Array.from(document.querySelectorAll(".mobile-drawer-nav-item"));
   const setActiveNav = (activeLink) => {
-    navLinks.forEach((l) => l.classList.remove("is-active"));
-    if (activeLink) activeLink.classList.add("is-active");
+    const targetHref = activeLink?.getAttribute("href") || activeLink?.getAttribute("data-target");
+    navLinks.forEach((l) => l.classList.toggle("is-active", (l.getAttribute("href") || l.getAttribute("data-target")) === targetHref));
+    drawerNavItems.forEach((d) => d.classList.toggle("is-active", (d.getAttribute("href") || d.getAttribute("data-target")) === targetHref));
   };
 
   const scrollToSection = (el) => {
@@ -660,29 +883,113 @@ document.addEventListener("DOMContentLoaded", () => {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const closeDetailIfOpen = () => {
+    const detailViewEl = document.getElementById("detail-view");
+    if (detailViewEl && !detailViewEl.hidden) {
+      detailViewEl.hidden = true;
+      detailViewEl.setAttribute("aria-hidden", "true");
+      document.querySelectorAll(".main-section").forEach((s) => (s.hidden = false));
+      if (detailViewEl.dataset.currentSectionId === "hero" && typeof renderHeroDisplay === "function") {
+        renderHeroDisplay();
+      }
+    }
+  };
+
   navLinks.forEach((link) => {
     link.addEventListener("click", (e) => {
       const hash = link.getAttribute("href");
       if (!hash || !hash.startsWith("#")) return;
       e.preventDefault();
-      const detailViewEl = document.getElementById("detail-view");
-      if (detailViewEl && !detailViewEl.hidden) {
-        detailViewEl.hidden = true;
-        detailViewEl.setAttribute("aria-hidden", "true");
-        document.querySelectorAll(".main-section").forEach((s) => (s.hidden = false));
-        if (detailViewEl.dataset.currentSectionId === "hero") {
-          if (typeof renderHeroDisplay === "function") renderHeroDisplay();
-        }
-      }
+      closeDetailIfOpen();
       setActiveNav(link);
       const target = document.querySelector(hash);
       if (target) scrollToSection(target);
     });
   });
 
+  const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+  const mobileDrawer = document.getElementById("mobile-drawer");
+  const mobileDrawerBackdrop = document.getElementById("mobile-drawer-backdrop");
+  const mobileDrawerClose = document.getElementById("mobile-drawer-close");
+  const openDrawer = () => {
+    body.classList.add("drawer-open");
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute("aria-expanded", "true");
+    if (mobileDrawer) mobileDrawer.setAttribute("aria-hidden", "false");
+  };
+  const closeDrawer = () => {
+    body.classList.remove("drawer-open");
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute("aria-expanded", "false");
+    if (mobileDrawer) mobileDrawer.setAttribute("aria-hidden", "true");
+  };
+  if (mobileMenuBtn) {
+    mobileMenuBtn.removeAttribute("hidden");
+    mobileMenuBtn.addEventListener("click", () => openDrawer());
+  }
+  if (mobileDrawerBackdrop) mobileDrawerBackdrop.addEventListener("click", () => closeDrawer());
+  if (mobileDrawerClose) mobileDrawerClose.addEventListener("click", () => closeDrawer());
+
+  drawerNavItems.forEach((link) => {
+    link.addEventListener("click", (e) => {
+      const hash = link.getAttribute("href");
+      if (!hash || !hash.startsWith("#")) return;
+      e.preventDefault();
+      closeDetailIfOpen();
+      setActiveNav(link);
+      const target = document.querySelector(hash);
+      if (target) scrollToSection(target);
+      closeDrawer();
+    });
+  });
+
+  const mobileDrawerThemeBtn = document.getElementById("mobile-drawer-theme-btn");
+  if (mobileDrawerThemeBtn && themeTrigger && themePanel) {
+    mobileDrawerThemeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeDrawer();
+      if (themePanel.hidden) {
+        themeWrap.classList.add("is-open");
+        themeTrigger.setAttribute("aria-expanded", "true");
+        themePanel.hidden = false;
+        themePanel.removeAttribute("aria-hidden");
+        document.body.classList.add("theme-panel-open");
+        document.body.appendChild(themePanel);
+      } else {
+        themeWrap.classList.remove("is-open");
+        themeTrigger.setAttribute("aria-expanded", "false");
+        themePanel.hidden = true;
+        themePanel.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("theme-panel-open");
+        if (themeWrap.parentElement) themeWrap.appendChild(themePanel);
+      }
+    });
+  }
+  const mobileDrawerMusic = document.getElementById("mobile-drawer-music");
+  if (mobileDrawerMusic && bgMusicToggle) {
+    mobileDrawerMusic.classList.toggle("is-muted", !!bgMusic.muted);
+    mobileDrawerMusic.addEventListener("click", () => bgMusicToggle.click());
+  }
+  const mobileDrawerCollapse = document.getElementById("mobile-drawer-collapse");
+  if (mobileDrawerCollapse && header) {
+    mobileDrawerCollapse.addEventListener("click", () => {
+      const collapsed = header.classList.toggle("is-collapsed");
+      if (body) body.classList.toggle("header-collapsed", collapsed);
+      mobileDrawerCollapse.textContent = collapsed ? "↓" : "↑";
+      const t = (typeof I18N !== "undefined" && I18N[getLang()]) ? I18N[getLang()] : {};
+      const label = collapsed ? (t["a11y.expandHeader"] || "展开顶栏") : (t["a11y.collapseHeader"] || "收起顶栏");
+      mobileDrawerCollapse.setAttribute("aria-label", label);
+      if (collapsed) {
+        const activeLink = document.querySelector(".site-header nav a.nav-item.is-active") || document.querySelector(".mobile-drawer-nav-item.is-active");
+        const targetSelector = activeLink?.getAttribute("href") || activeLink?.getAttribute("data-target") || "#hero-display";
+        const target = document.querySelector(targetSelector);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
   if (sections.length) {
     const getHeaderHeight = () => document.querySelector(".site-header")?.offsetHeight || 0;
-    const onScroll = throttle(() => {
+    const updateSectionActive = () => {
       const headerH = getHeaderHeight();
       const scrollY = window.scrollY + headerH + 50;
       let current = sections[0];
@@ -690,13 +997,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (s.el.offsetTop <= scrollY) current = s;
       });
       setActiveNav(current.link);
-    }, 100);
+    };
+    const onScroll = throttleRAF(updateSectionActive, 100);
     window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    updateSectionActive();
   }
 
   applyLangToPage(getLang());
   applyCustomHeaderNames();
+  if (typeof getThemeToApply === "function") applyTheme(getThemeToApply());
+  if (typeof renderThemeList === "function") renderThemeList();
 
   const STORAGE_STARS_DISABLED = "site-stars-disabled";
   const starfieldOverlay = document.getElementById("starfield-overlay");
@@ -724,32 +1034,31 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const langToggle = document.querySelector(".lang-toggle");
-  if (langToggle) {
-    langToggle.addEventListener("click", () => {
-      const next = getLang() === "zh" ? "en" : "zh";
-      setLang(next);
-      applyLangToPage(next);
-      applyCustomHeaderNames();
-      if (typeof detailView !== "undefined" && detailView && !detailView.hidden && typeof detailBody !== "undefined" && detailBody) {
-        const sectionId = detailView.dataset.currentSectionId;
-        if (sectionId) {
-          const section = document.getElementById(sectionId);
-          if (section) {
-            const titleEl = section.querySelector("h2");
-            const descEl = section.querySelector("p");
-            const t = detailBody.querySelector(".detail-title");
-            const s = detailBody.querySelector(".detail-subtitle");
-            if (t && titleEl) t.textContent = titleEl.textContent;
-            if (s && descEl) s.textContent = descEl.textContent;
-          }
-          if (typeof applyDetailConfig === "function") {
-            applyDetailConfig(sectionId);
-          }
+  const langToggleHandler = () => {
+    const next = getLang() === "zh" ? "en" : "zh";
+    applyLangToPage(next);
+    applyCustomHeaderNames();
+    if (typeof detailView !== "undefined" && detailView && !detailView.hidden && typeof detailBody !== "undefined" && detailBody) {
+      const sectionId = detailView.dataset.currentSectionId;
+      if (sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+          const titleEl = section.querySelector("h2");
+          const descEl = section.querySelector("p");
+          const t = detailBody.querySelector(".detail-title");
+          const s = detailBody.querySelector(".detail-subtitle");
+          if (t && titleEl) t.textContent = titleEl.textContent;
+          if (s && descEl) s.textContent = descEl.textContent;
+        }
+        if (typeof applyDetailConfig === "function") {
+          applyDetailConfig(sectionId);
         }
       }
-    });
-  }
+    }
+  };
+  document.querySelectorAll(".lang-toggle").forEach((el) => {
+    el.addEventListener("click", langToggleHandler);
+  });
 
   const headerNameEditBtn = document.getElementById("header-name-edit-btn");
   const headerNameEditPopover = document.getElementById("header-name-edit-popover");
@@ -946,6 +1255,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const detailView = document.getElementById("detail-view");
   const detailBody = detailView?.querySelector(".detail-body");
   const mainSections = Array.from(document.querySelectorAll(".main-section"));
+  /** 移动端打开板块详情时从 DOM 移走的「收起首屏」栏，关闭时插回 */
+  var removedHeroCollapseBar = null;
+  var removedHeroCollapseBarNext = null;
 
   const STORAGE_AVATAR = "site-avatar";
   const STORAGE_AVATAR_DISPLAY = "site-avatar-display";
@@ -1128,6 +1440,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const str = JSON.stringify(list);
       localStorage.setItem(STORAGE_PREFIX + sectionId, str);
+      if (onSectionDataChanged) onSectionDataChanged(sectionId);
       return true;
     } catch (e) {
       if (e && e.name === "QuotaExceededError") {
@@ -1136,6 +1449,7 @@ document.addEventListener("DOMContentLoaded", () => {
             i === list.length - 1 ? { ...item, fileDataUrl: "" } : item
           );
           localStorage.setItem(STORAGE_PREFIX + sectionId, JSON.stringify(lastOnly));
+          if (onSectionDataChanged) onSectionDataChanged(sectionId);
         } catch (e2) {
           try {
             const withoutDataUrls = list.map((item) => {
@@ -1143,6 +1457,7 @@ document.addEventListener("DOMContentLoaded", () => {
               return rest;
             });
             localStorage.setItem(STORAGE_PREFIX + sectionId, JSON.stringify(withoutDataUrls));
+            if (onSectionDataChanged) onSectionDataChanged(sectionId);
           } catch (e3) {
             console.warn("Save submissions failed (quota)", e3);
           }
@@ -1259,7 +1574,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sectionId === "moments") {
       items = [...items].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     }
-    if (detailFilterDate) {
+    if (sectionId === "references") {
+      items = [...(items || [])].sort((a, b) => (b.year || "").localeCompare(a.year || ""));
+    }
+    if (detailFilterDate && sectionId !== "references") {
       const dateStr = String(detailFilterDate).trim();
       if (dateStr) items = items.filter((it) => (it.date || "").startsWith(dateStr));
     }
@@ -1354,7 +1672,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${item.creator ? `<p class="detail-card-meta">${t(item.creator)}</p>` : ""}
             ${item.desc ? `<div class="detail-card-long-desc">${t(item.desc)}</div>` : ""}
             ${linkHtml}
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
       } else if (layout === "voice") {
@@ -1364,7 +1682,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${item.creator ? `<span class="detail-card-trigger">${t(item.creator)}</span>` : ""}
             ${item.desc ? `<p class="detail-card-line-text">${t(item.desc)}</p>` : ""}
             ${linkHtml}
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
       } else if (layout === "fanworks") {
@@ -1376,7 +1694,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <h4 class="detail-card-title">${t(item.title)}</h4>
             ${item.desc ? `<p class="detail-card-desc">${t(item.desc)}</p>` : ""}
             ${linkHtml}
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
       } else if (layout === "gallery") {
@@ -1387,7 +1705,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${item.creator ? `<p class="detail-card-meta">${t(item.creator)}</p>` : ""}
             ${item.desc ? `<p class="detail-card-desc">${t(item.desc)}</p>` : ""}
             ${linkHtml}
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
       } else if (layout === "links") {
@@ -1397,7 +1715,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${item.creator ? `<p class="detail-card-meta">${t(item.creator)}</p>` : ""}
             ${item.link ? `<a class="detail-card-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">${t(item.link)}</a>` : ""}
             ${item.desc ? `<p class="detail-card-desc">${t(item.desc)}</p>` : ""}
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
       } else if (layout === "moments") {
@@ -1406,22 +1724,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const commentsHtml = comments.map((c) => `<div class="moments-comment-item"><span class="moments-comment-text">${escapeHtml(c.text || "")}</span></div>`).join("");
         const imgUrl = item.imageDataUrl || item.fileDataUrl || "";
         const imageBlock = imgUrl ? `<div class="moments-card-image-wrap"><img class="moments-card-image" src="${String(imgUrl).replace(/"/g, "&quot;")}" alt=""></div>` : "";
+        const rawContent = item.content || "";
+        const isRich = /<[a-z][\s\S]*>/i.test(rawContent);
+        const contentHtml = isRich ? sanitizeHtml(rawContent) : escapeHtml(rawContent).replace(/\n/g, "<br>");
+        const titleBlock = item.title ? `<div class="moments-card-note-title">${escapeHtml(item.title)}</div>` : "";
         card.innerHTML = `
           <div class="detail-card-body detail-card-moments">
             <div class="moments-card-date">${escapeHtml(item.date || "")}</div>
+            ${titleBlock}
             ${imageBlock}
-            <div class="moments-card-content">${escapeHtml((item.content || "").replace(/\n/g, "<br>"))}</div>
+            <div class="moments-card-content moments-card-content--rich">${contentHtml}</div>
             ${item.emoji ? `<div class="moments-card-emoji">${escapeHtml(item.emoji)}</div>` : ""}
             <div class="moments-card-actions">
-              <button type="button" class="moments-like-btn" data-moment-id="${escapeHtml(item.id || "")}">${i18n["moments.like"] || "赞"} ${likeCount > 0 ? likeCount : ""}</button>
-              <span class="moments-comment-count">${i18n["moments.comment"] || "评论"} ${comments.length}</span>
+              <button type="button" class="moments-like-btn" data-moment-id="${escapeHtml(item.id || "")}"><span class="moments-action-icon moments-like-icon" aria-hidden="true"></span><span class="moments-action-label">${escapeHtml(i18n["moments.like"] || "赞")} ${likeCount > 0 ? likeCount : ""}</span></button>
+              <span class="moments-comment-count"><span class="moments-action-icon moments-comment-icon" aria-hidden="true"></span><span class="moments-action-label">${escapeHtml(i18n["moments.comment"] || "评论")} </span><span class="moments-action-num">${comments.length}</span></span>
             </div>
             <div class="moments-comments-list">${commentsHtml}</div>
             <div class="moments-comment-form">
               <input type="text" class="moments-comment-input" placeholder="${escapeHtml(i18n["moments.addComment"] || "写评论…")}" data-moment-id="${escapeHtml(item.id || "")}">
               <button type="button" class="moments-comment-send" data-moment-id="${escapeHtml(item.id || "")}">${i18n["moments.sendComment"] || "发送"}</button>
             </div>
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
         const likeBtn = card.querySelector(".moments-like-btn");
@@ -1453,6 +1776,24 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         if (commentSend) commentSend.addEventListener("click", sendComment);
         if (commentInput) commentInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); sendComment(); } });
+      } else if (layout === "refs") {
+        if (item.id) card.dataset.refId = item.id;
+        const a = escapeHtml(item.author || "");
+        const y = escapeHtml(item.year || "");
+        const t = escapeHtml(item.title || "");
+        const u = (item.url || "").trim();
+        const n = escapeHtml(item.note || "");
+        const cite = [a, y ? `(${y})` : "", t].filter(Boolean).join(". ");
+        const linkPart = u ? `<a class="detail-ref-card-link" href="${escapeHtml(u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(u)}</a>` : "";
+        const notePart = n ? `<p class="detail-ref-card-note">${n}</p>` : "";
+        card.innerHTML = `
+          <div class="detail-card-body detail-card-ref">
+            <div class="detail-ref-card-cite">${cite}</div>
+            ${linkPart}
+            ${notePart}
+            <button type="button" class="detail-card-delete">${i18n["hero.delete"] || "删除"}</button>
+          </div>
+        `;
       } else {
         card.innerHTML = `
           ${thumb}
@@ -1461,7 +1802,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ${item.creator ? `<p class="detail-card-creator">${t(item.creator)}</p>` : ""}
             ${item.desc ? `<p class="detail-card-desc">${t(item.desc)}</p>` : ""}
             ${linkHtml}
-            <button type="button" class="detail-card-delete">删除</button>
+            <button type="button" class="detail-card-delete">${escapeHtml(i18n["hero.delete"] || "删除")}</button>
           </div>
         `;
       }
@@ -1473,6 +1814,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  /** OneNote 风格：只允许安全标签，用于随笔富文本 */
+  function sanitizeHtml(html) {
+    if (!html || typeof html !== "string") return "";
+    try {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const allowed = new Set(["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "h2", "h3", "span"]);
+      function walk(node) {
+        if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent || "");
+        if (node.nodeType !== Node.ELEMENT_NODE) return "";
+        const tag = node.tagName.toLowerCase();
+        if (!allowed.has(tag)) return Array.from(node.childNodes).map(walk).join("");
+        const children = Array.from(node.childNodes).map(walk).join("");
+        if (tag === "br") return "<br>";
+        return "<" + tag + ">" + children + "</" + tag + ">";
+      }
+      return Array.from(doc.body.childNodes).map(walk).join("");
+    } catch (_) {
+      return escapeHtml(html);
+    }
   }
 
   const heroDisplaySection = document.getElementById("hero-display");
@@ -1544,6 +1906,30 @@ document.addEventListener("DOMContentLoaded", () => {
   if (heroDisplayInner) {
     heroDisplayInner.addEventListener("mouseenter", () => heroDisplaySection.classList.add("hero-display--nav-hover"));
     heroDisplayInner.addEventListener("mouseleave", () => heroDisplaySection.classList.remove("hero-display--nav-hover"));
+    /* 移动端：首屏左右滑动切换图片（桌面端仍用箭头点击）；仅水平滑动明显时切换，避免与垂直滚动冲突 */
+    let heroTouchStartX = 0, heroTouchStartY = 0;
+    heroDisplayInner.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1) {
+        heroTouchStartX = e.touches[0].clientX;
+        heroTouchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+    heroDisplayInner.addEventListener("touchend", (e) => {
+      if (e.changedTouches.length !== 1) return;
+      const items = getSectionSubmissions("hero");
+      if (items.length < 2) return;
+      const x = e.changedTouches[0].clientX, y = e.changedTouches[0].clientY;
+      const dx = x - heroTouchStartX, dy = y - heroTouchStartY;
+      const threshold = 50;
+      if (Math.abs(dx) < threshold || Math.abs(dy) > Math.abs(dx)) return;
+      if (dx < -threshold) {
+        heroCurrentIndex = (heroCurrentIndex + 1) % items.length;
+        renderHeroDisplay();
+      } else if (dx > threshold) {
+        heroCurrentIndex = (heroCurrentIndex - 1 + items.length) % items.length;
+        renderHeroDisplay();
+      }
+    }, { passive: true });
   }
   const heroPrevBtn = heroDisplaySection?.querySelector(".hero-display-prev");
   const heroNextBtn = heroDisplaySection?.querySelector(".hero-display-next");
@@ -1617,6 +2003,8 @@ document.addEventListener("DOMContentLoaded", () => {
       let index;
       if (sectionId === "moments" && card.dataset.momentId) {
         index = list.findIndex((m) => m.id === card.dataset.momentId);
+      } else if (sectionId === "references" && card.dataset.refId) {
+        index = list.findIndex((r) => r.id === card.dataset.refId);
       } else {
         const cards = Array.from(displayListRoot.children);
         index = cards.indexOf(card);
@@ -1859,7 +2247,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /** 站点板块顺序（与 index.html 导航、main 内 section 顺序一致，上传 Vercel 后即按此展示） */
-  const SECTION_ORDER = ["hero", "about", "story", "gallery", "voice", "fanworks", "moments", "books"];
+  const SECTION_ORDER = ["about", "story", "gallery", "voice", "fanworks", "moments", "references", "books", "hero"];
 
   const DETAIL_CONFIG = {
     hero: {
@@ -2086,6 +2474,15 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       fields: {},
     },
+    references: {
+      displayLayout: "refs",
+      displayTitle: { zh: "文献检索区", en: "References" },
+      displayHint: {
+        zh: "管理参考文献，支持作者、标题、年份、链接与备注。",
+        en: "Manage references with author, title, year, URL and notes.",
+      },
+      fields: {},
+    },
     books: {
       displayLayout: "books",
       displayTitle: { zh: "Olib 电子书", en: "Olib Books" },
@@ -2116,9 +2513,11 @@ document.addEventListener("DOMContentLoaded", () => {
         booksWrap.style.display = "none";
         booksWrap.style.visibility = "hidden";
         var iframe = document.getElementById("detail-books-iframe");
-        if (iframe) iframe.src = "";
+        if (iframe) { iframe.src = ""; iframe.style.display = ""; }
         var loadingEl = document.getElementById("detail-books-loading");
-        if (loadingEl) { loadingEl.classList.remove("is-hidden"); loadingEl.textContent = "正在加载 Olib 电子书…"; }
+        if (loadingEl) { loadingEl.classList.remove("is-hidden"); loadingEl.textContent = (I18N[getLang()] && I18N[getLang()]["books.loading"]) || "正在加载 Olib 电子书…"; }
+        var fb = document.getElementById("detail-books-fallback");
+        if (fb) { fb.setAttribute("hidden", ""); fb.setAttribute("aria-hidden", "true"); }
       }
     }
     if (refinedBlock) refinedBlock.style.display = isBooks ? "none" : "";
@@ -2224,16 +2623,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const isMoments = sectionId === "moments";
+    const isReferences = sectionId === "references";
+    detailBody.querySelectorAll("[data-detail-only-section=\"references\"]").forEach((el) => {
+      el.style.display = isReferences ? "block" : "none";
+      if (isReferences && el.getAttribute("hidden") !== null) el.removeAttribute("hidden");
+      if (!isReferences) el.setAttribute("hidden", "");
+    });
     const avatarLabelEl = detailBody.querySelector(".detail-avatar-text");
     const avatarCropOptions = detailBody.querySelector(".detail-avatar-display-options");
     if (avatarLabelEl) {
       if (isMoments) avatarLabelEl.textContent = (I18N[lang] || I18N.zh || {})["moments.uploadImage"] || (isEn ? "Upload image" : "上传图片");
       else avatarLabelEl.textContent = (I18N[lang] || I18N.zh || {})["detail.avatar"] || (isEn ? "Avatar" : "头像");
     }
-    if (avatarCropOptions) avatarCropOptions.style.display = isMoments ? "none" : "";
+    if (avatarCropOptions) avatarCropOptions.style.display = (isMoments || isReferences) ? "none" : "";
+    const avatarArea = detailBody.querySelector(".detail-avatar-area");
+    if (avatarArea) avatarArea.style.display = isReferences ? "none" : "";
     const standardForm = detailBody.querySelector(".detail-submit-form");
     const momentsFormEl = document.getElementById("detail-moments-form");
-    if (standardForm) standardForm.style.display = isMoments ? "none" : "";
+    const refsFormEl = document.getElementById("detail-refs-form");
+    if (standardForm) standardForm.style.display = (isMoments || isReferences) ? "none" : "";
     if (momentsFormEl) {
       momentsFormEl.style.display = isMoments ? "block" : "none";
       if (isMoments) {
@@ -2244,8 +2652,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const pad = (n) => String(n).padStart(2, "0");
           dateInp.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
         }
-        const contentPh = document.getElementById("moments-content");
-        if (contentPh) contentPh.placeholder = (I18N[lang] || I18N.zh || {})["moments.contentPh"] || (isEn ? "Write your thought…" : "写下此刻灵感…");
+        const richEditor = document.getElementById("moments-content-rich");
+        if (richEditor) richEditor.setAttribute("data-placeholder", (I18N[lang] || I18N.zh || {})["moments.contentPh"] || (isEn ? "Write your thought…" : "写下此刻灵感…"));
+        const titleInp = document.getElementById("moments-title");
+        if (titleInp) titleInp.placeholder = (I18N[lang] || I18N.zh || {})["moments.noteTitlePh"] || (isEn ? "Enter title" : "输入标题");
         const strip = document.getElementById("moments-emoji-strip");
         if (strip && strip.children.length === 0) {
           ["😊", "🌟", "💡", "✨", "🎉", "❤️", "🔥", "👍"].forEach((emoji) => {
@@ -2261,6 +2671,11 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         }
       } else momentsFormEl.setAttribute("hidden", "");
+    }
+    if (refsFormEl) {
+      refsFormEl.style.display = isReferences ? "block" : "none";
+      if (isReferences) refsFormEl.removeAttribute("hidden");
+      else refsFormEl.setAttribute("hidden", "");
     }
   };
 
@@ -2656,6 +3071,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const openDetailView = (sectionEl) => {
     if (!detailView || !sectionEl || !detailBody) return;
+    if (document.body.classList.contains("drawer-open")) document.body.classList.remove("drawer-open");
     detailFilterDate = null;
     const filterOverlay = document.getElementById("detail-filter-by-date-overlay");
     if (filterOverlay) {
@@ -2686,26 +3102,53 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sectionId === "books") {
       const booksIframe = document.getElementById("detail-books-iframe");
       const booksLoading = document.getElementById("detail-books-loading");
+      const booksFallback = document.getElementById("detail-books-fallback");
       if (booksIframe && booksLoading) {
+        if (booksFallback) {
+          booksFallback.setAttribute("hidden", "");
+          booksFallback.setAttribute("aria-hidden", "true");
+        }
+        booksIframe.style.display = "";
         booksLoading.classList.remove("is-hidden");
+        booksLoading.textContent = (I18N[getLang()] && I18N[getLang()]["books.loading"]) || "正在加载 Olib 电子书…";
         try {
           const olibUrl = new URL("olib/index.html", window.location.href).href;
           booksIframe.src = olibUrl;
-          const onLoad = () => {
+          var resolved = false;
+          var timeoutId = null;
+          const finish = (showFallback) => {
+            if (resolved) return;
+            resolved = true;
+            if (timeoutId) clearTimeout(timeoutId);
             booksLoading.classList.add("is-hidden");
             booksIframe.removeEventListener("load", onLoad);
             booksIframe.removeEventListener("error", onErr);
+            if (showFallback && booksFallback) {
+              var msgEl = booksFallback.querySelector(".detail-books-fallback-msg");
+              if (msgEl) msgEl.textContent = (I18N[getLang()] && I18N[getLang()]["books.noFlutter"]) || msgEl.getAttribute("data-i18n") || "当前未配置 Olib 电子书，本站其他板块可正常使用。";
+              booksFallback.removeAttribute("hidden");
+              booksFallback.removeAttribute("aria-hidden");
+              booksIframe.style.display = "none";
+            } else if (booksFallback) {
+              booksFallback.setAttribute("hidden", "");
+              booksFallback.setAttribute("aria-hidden", "true");
+              booksIframe.style.display = "";
+            }
           };
-          const onErr = () => {
-            booksLoading.textContent = "Olib 加载失败，请确认 olib 目录已正确部署。";
-            booksLoading.classList.remove("is-hidden");
-            booksIframe.removeEventListener("load", onLoad);
-            booksIframe.removeEventListener("error", onErr);
-          };
+          const onLoad = () => finish(false);
+          const onErr = () => finish(true);
+          timeoutId = setTimeout(function () { if (!resolved) finish(true); }, 18000);
           booksIframe.addEventListener("load", onLoad);
           booksIframe.addEventListener("error", onErr);
         } catch (e) {
-          booksLoading.textContent = "Olib 加载出错：" + (e && e.message ? e.message : "未知");
+          booksLoading.classList.add("is-hidden");
+          if (booksFallback) {
+            var msgEl = booksFallback.querySelector(".detail-books-fallback-msg");
+            if (msgEl) msgEl.textContent = (I18N[getLang()] && I18N[getLang()]["books.noFlutter"]) || "当前未配置 Olib 电子书，本站其他板块可正常使用。";
+            booksFallback.removeAttribute("hidden");
+            booksFallback.removeAttribute("aria-hidden");
+            if (booksIframe) booksIframe.style.display = "none";
+          }
         }
       }
     }
@@ -2718,6 +3161,17 @@ document.addEventListener("DOMContentLoaded", () => {
     detailView.removeAttribute("aria-hidden");
     detailView.classList.remove("detail-view-visible");
     detailView.classList.toggle("detail-view--books-mode", sectionId === "books");
+    document.body.classList.add("detail-view-open");
+    var heroCollapseBar = document.getElementById("hero-collapse-bar");
+    if (heroCollapseBar && window.matchMedia("(max-width: 768px)").matches) {
+      var parent = heroCollapseBar.parentNode;
+      var next = heroCollapseBar.nextElementSibling;
+      if (parent) {
+        parent.removeChild(heroCollapseBar);
+        removedHeroCollapseBar = heroCollapseBar;
+        removedHeroCollapseBarNext = next;
+      }
+    }
     if (sectionId === "books") {
       const openNewLink = document.getElementById("detail-books-open-new");
       if (openNewLink) openNewLink.href = new URL("olib/index.html", window.location.href).href;
@@ -2727,14 +3181,27 @@ document.addEventListener("DOMContentLoaded", () => {
       detailView.classList.add("detail-view-visible");
     });
     requestAnimationFrame(() => {
-      const mainTop = document.querySelector("main")?.offsetTop ?? 0;
-      window.scrollTo({ top: Math.max(0, mainTop - 80), behavior: "smooth" });
+      if (!window.matchMedia("(max-width: 768px)").matches) {
+        const mainTop = document.querySelector("main")?.offsetTop ?? 0;
+        window.scrollTo({ top: Math.max(0, mainTop - 80), behavior: "smooth" });
+      }
     });
   };
 
   const closeDetailView = () => {
     if (!detailView) return;
     const wasHero = detailView.dataset.currentSectionId === "hero";
+    document.body.classList.remove("detail-view-open");
+    if (removedHeroCollapseBar && removedHeroCollapseBarNext && removedHeroCollapseBarNext.parentNode) {
+      removedHeroCollapseBarNext.parentNode.insertBefore(removedHeroCollapseBar, removedHeroCollapseBarNext);
+      removedHeroCollapseBar = null;
+      removedHeroCollapseBarNext = null;
+    }
+    var heroCollapseBar = document.getElementById("hero-collapse-bar");
+    if (heroCollapseBar) {
+      heroCollapseBar.removeAttribute("hidden");
+      heroCollapseBar.removeAttribute("aria-hidden");
+    }
     detailView.classList.remove("detail-view-visible", "detail-view--books-mode");
     detailView.hidden = true;
     detailView.setAttribute("aria-hidden", "true");
@@ -2767,9 +3234,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const backBtn = detailView?.querySelector(".detail-back-btn");
-  if (backBtn) backBtn.addEventListener("click", closeDetailView);
+  if (backBtn) {
+    backBtn.addEventListener("click", closeDetailView);
+    backBtn.addEventListener("touchend", function (e) {
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        e.preventDefault();
+        closeDetailView();
+      }
+    }, { passive: false });
+  }
   const detailCollapseBtn = document.getElementById("detail-collapse-btn");
-  if (detailCollapseBtn) detailCollapseBtn.addEventListener("click", closeDetailView);
+  if (detailCollapseBtn) {
+    detailCollapseBtn.addEventListener("click", closeDetailView);
+    detailCollapseBtn.addEventListener("touchend", function (e) {
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        e.preventDefault();
+        closeDetailView();
+      }
+    }, { passive: false });
+  }
 
   renderHeroDisplay();
 
@@ -3078,7 +3561,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (momentsSubmitBtn) {
     momentsSubmitBtn.addEventListener("click", () => {
       const dateInp = document.getElementById("moments-date");
-      const contentInp = document.getElementById("moments-content");
+      const richEl = document.getElementById("moments-content-rich");
+      const titleInp = document.getElementById("moments-title");
       const emojiInp = document.getElementById("moments-emoji-input");
       let dateStr = (dateInp?.value || "").trim();
       if (dateStr) {
@@ -3093,8 +3577,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const pad = (n) => String(n).padStart(2, "0");
         dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
       }
-      const content = (contentInp?.value || "").trim();
-      const emoji = (emojiInp?.value || "").trim();
+      const title = (titleInp?.value || "").trim();
+      let content = "";
+      if (richEl) {
+        const raw = (richEl.innerHTML || "").trim();
+        const textOnly = (richEl.textContent || "").trim();
+        if (textOnly) content = raw ? sanitizeHtml(raw) : escapeHtml(textOnly).replace(/\n/g, "<br>");
+      }
       if (!content) return;
       const previewImg = detailView?.querySelector(".detail-avatar-preview-img");
       const imageDataUrl = (previewImg?.src && previewImg.src.startsWith("data:")) ? previewImg.src : "";
@@ -3102,15 +3591,17 @@ document.addEventListener("DOMContentLoaded", () => {
       list.push({
         id: "m-" + Date.now(),
         date: dateStr,
+        title: title || undefined,
         content,
-        emoji: emoji || undefined,
+        emoji: (emojiInp?.value || "").trim() || undefined,
         imageDataUrl: imageDataUrl || undefined,
         likes: 0,
         comments: [],
       });
       setSectionSubmissions("moments", list);
       renderDisplayList("moments");
-      if (contentInp) contentInp.value = "";
+      if (titleInp) titleInp.value = "";
+      if (richEl) richEl.innerHTML = "";
       if (emojiInp) emojiInp.value = "";
       if (previewImg) previewImg.src = "";
       const avatarInput = detailView?.querySelector(".detail-avatar-input");
@@ -3123,6 +3614,43 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  document.querySelectorAll(".moments-toolbar-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const cmd = btn.getAttribute("data-cmd");
+      const arg = btn.getAttribute("data-arg") || null;
+      document.getElementById("moments-content-rich")?.focus();
+      if (cmd === "formatBlock" && arg) document.execCommand("formatBlock", false, arg);
+      else if (cmd) document.execCommand(cmd, false, arg);
+    });
+  });
+
+  const refsSubmitBtn = document.getElementById("refs-submit-btn");
+  if (refsSubmitBtn) {
+    refsSubmitBtn.addEventListener("click", () => {
+      const author = (document.getElementById("refs-author")?.value || "").trim();
+      const title = (document.getElementById("refs-title")?.value || "").trim();
+      const year = (document.getElementById("refs-year")?.value || "").trim();
+      const url = (document.getElementById("refs-url")?.value || "").trim();
+      const note = (document.getElementById("refs-note")?.value || "").trim();
+      if (!author && !title && !year && !url && !note) return;
+      const list = getSectionSubmissions("references") || [];
+      list.push({ id: "ref-" + Date.now(), author, title, year, url, note });
+      setSectionSubmissions("references", list);
+      renderDisplayList("references");
+      const authorInp = document.getElementById("refs-author");
+      const titleInp = document.getElementById("refs-title");
+      const yearInp = document.getElementById("refs-year");
+      const urlInp = document.getElementById("refs-url");
+      const noteInp = document.getElementById("refs-note");
+      if (authorInp) authorInp.value = "";
+      if (titleInp) titleInp.value = "";
+      if (yearInp) yearInp.value = "";
+      if (urlInp) urlInp.value = "";
+      if (noteInp) noteInp.value = "";
+    });
+  }
+
   const SECTION_IDS = Object.keys(DETAIL_CONFIG || {});
   const importExportOverlay = document.getElementById("detail-import-export-overlay");
   const importExportBackdrop = document.getElementById("detail-import-export-backdrop");
@@ -3131,7 +3659,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const exportPdfA4Btn = document.getElementById("detail-export-pdf-a4");
   const exportPdfLongBtn = document.getElementById("detail-export-pdf-long");
   const importExportToast = document.getElementById("detail-import-export-toast");
-  const t = (key) => ((I18N[getLang()] || I18N.zh)[key] || key);
 
   function showImportExportToast(message, isError) {
     if (!importExportToast) return;
@@ -3152,11 +3679,29 @@ document.addEventListener("DOMContentLoaded", () => {
     if (importExportBtn) importExportBtn.setAttribute("aria-expanded", "false");
   }
 
+  const SYNC_DATA_FILENAME = "克丽斯腾-data.json";
+  /** 每个板块独立子文件夹名，文件夹内仅存该板块的 data.json，内容互不混杂 */
+  const getSyncSectionDirName = (sectionId) => `克丽斯腾-${sectionId}`;
+  const SYNC_SECTION_DATA_FILE = "data.json";
+
+  function buildExportPayload() {
+    const sections = {};
+    SECTION_IDS.forEach((id) => {
+      sections[id] = getSectionSubmissions(id) || [];
+    });
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      sections,
+    };
+  }
+
   function applyImportedData(data) {
     if (!data || typeof data !== "object") return false;
+    const raw = data.sections && typeof data.sections === "object" ? data.sections : data;
     let applied = 0;
     SECTION_IDS.forEach((sectionId) => {
-      const arr = data[sectionId];
+      const arr = raw[sectionId];
       if (!Array.isArray(arr)) return;
       try {
         setSectionSubmissions(sectionId, arr);
@@ -3323,6 +3868,162 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (exportPdfA4Btn) exportPdfA4Btn.addEventListener("click", () => runPdfExport("a4"));
   if (exportPdfLongBtn) exportPdfLongBtn.addEventListener("click", () => runPdfExport("long"));
+
+  const exportJsonBtn = document.getElementById("detail-export-json-btn");
+  if (exportJsonBtn) {
+    exportJsonBtn.addEventListener("click", () => {
+      const payload = buildExportPayload();
+      const str = JSON.stringify(payload, null, 2);
+      const blob = new Blob([str], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = SYNC_DATA_FILENAME;
+      a.click();
+      URL.revokeObjectURL(url);
+      showImportExportToast(t("detail.exportSuccess"));
+    });
+  }
+
+  const importFileInput = document.getElementById("detail-import-file-input");
+  if (importFileInput) {
+    importFileInput.addEventListener("change", () => {
+      const file = importFileInput.files && importFileInput.files[0];
+      importFileInput.value = "";
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (applyImportedData(data)) {
+            const sectionId = detailView?.dataset.currentSectionId;
+            if (sectionId) renderDisplayList(sectionId);
+            if (SECTION_IDS.includes("hero")) renderHeroDisplay(true);
+            showImportExportToast(t("detail.importSuccess"));
+            closeImportExportOverlay();
+          } else {
+            showImportExportToast(t("detail.importFail"), true);
+          }
+        } catch (_) {
+          showImportExportToast(t("detail.importFail"), true);
+        }
+      };
+      reader.onerror = () => showImportExportToast(t("detail.importFail"), true);
+      reader.readAsText(file, "utf-8");
+    });
+  }
+
+  const syncWrap = document.getElementById("detail-import-export-sync-wrap");
+  if (typeof window.showDirectoryPicker === "function" && syncWrap) {
+    syncWrap.removeAttribute("hidden");
+    const syncPickBtn = document.getElementById("detail-sync-pick-dir-btn");
+    const syncReadBtn = document.getElementById("detail-sync-read-btn");
+    const syncWriteBtn = document.getElementById("detail-sync-write-btn");
+    /** 按板块自动写入同步文件夹：防抖 800ms，选择文件夹后无需再手动点保存即可随编辑更新 */
+    const sectionSaveTimeouts = {};
+    const SYNC_DEBOUNCE_MS = 800;
+    function scheduleSectionSyncToFolder(sectionId) {
+      clearTimeout(sectionSaveTimeouts[sectionId]);
+      sectionSaveTimeouts[sectionId] = setTimeout(async () => {
+        const root = syncDirHandle;
+        if (!root) return;
+        try {
+          const dirHandle = await root.getDirectoryHandle(getSyncSectionDirName(sectionId), { create: true });
+          const fileHandle = await dirHandle.getFileHandle(SYNC_SECTION_DATA_FILE, { create: true });
+          const writable = await fileHandle.createWritable();
+          const list = getSectionSubmissions(sectionId) || [];
+          await writable.write(JSON.stringify(list, null, 2));
+          await writable.close();
+        } catch (_) {}
+      }, SYNC_DEBOUNCE_MS);
+    }
+    onSectionDataChanged = scheduleSectionSyncToFolder;
+
+    if (syncPickBtn) {
+      syncPickBtn.addEventListener("click", async () => {
+        try {
+          syncDirHandle = await window.showDirectoryPicker();
+          showImportExportToast(t("detail.syncFolderPicked") || "已选择同步文件夹", false);
+        } catch (e) {
+          if (e.name !== "AbortError") showImportExportToast(t("detail.importFail") + " (" + (e.message || "无法访问文件夹") + ")", true);
+        }
+      });
+    }
+    if (syncReadBtn) {
+      syncReadBtn.addEventListener("click", async () => {
+        const handle = syncDirHandle;
+        if (!handle) {
+          showImportExportToast((t("detail.syncPickFirst") || "请先点击「选择同步文件夹」"), true);
+          return;
+        }
+        try {
+          let applied = 0;
+          onSectionDataChanged = null;
+          try {
+            const fileHandle = await handle.getFileHandle(SYNC_DATA_FILENAME, { create: false });
+            const file = await fileHandle.getFile();
+            const data = JSON.parse(await file.text());
+            if (applyImportedData(data)) applied = SECTION_IDS.length;
+          } catch (e) {
+            if (e.name !== "NotFoundError") throw e;
+          }
+          if (applied === 0) {
+            for (const sectionId of SECTION_IDS) {
+              try {
+                const dirHandle = await handle.getDirectoryHandle(getSyncSectionDirName(sectionId), { create: false });
+                const fileHandle = await dirHandle.getFileHandle(SYNC_SECTION_DATA_FILE, { create: false });
+                const file = await fileHandle.getFile();
+                const arr = JSON.parse(await file.text());
+                if (Array.isArray(arr)) {
+                  setSectionSubmissions(sectionId, arr);
+                  applied++;
+                }
+              } catch (_) {}
+            }
+          }
+          onSectionDataChanged = scheduleSectionSyncToFolder;
+          if (applied > 0) {
+            const sectionId = detailView?.dataset.currentSectionId;
+            if (sectionId) renderDisplayList(sectionId);
+            if (SECTION_IDS.includes("hero")) renderHeroDisplay(true);
+            showImportExportToast(t("detail.importSuccess"));
+            closeImportExportOverlay();
+          } else {
+            showImportExportToast((t("detail.syncFileNotFound") || "同步文件夹内未找到数据文件"), true);
+          }
+        } catch (e) {
+          if (e.name === "NotFoundError") showImportExportToast((t("detail.syncFileNotFound") || "同步文件夹内未找到数据文件"), true);
+          else showImportExportToast(t("detail.importFail") + " (" + (e.message || String(e)) + ")", true);
+        }
+      });
+    }
+    if (syncWriteBtn) {
+      syncWriteBtn.addEventListener("click", async () => {
+        const handle = syncDirHandle;
+        if (!handle) {
+          showImportExportToast((t("detail.syncPickFirst") || "请先点击「选择同步文件夹」"), true);
+          return;
+        }
+        try {
+          for (const sectionId of SECTION_IDS) {
+            const dirHandle = await handle.getDirectoryHandle(getSyncSectionDirName(sectionId), { create: true });
+            const fileHandle = await dirHandle.getFileHandle(SYNC_SECTION_DATA_FILE, { create: true });
+            const writable = await fileHandle.createWritable();
+            const list = getSectionSubmissions(sectionId) || [];
+            await writable.write(JSON.stringify(list, null, 2));
+            await writable.close();
+          }
+          const fileHandle = await handle.getFileHandle(SYNC_DATA_FILENAME, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(JSON.stringify(buildExportPayload(), null, 2));
+          await writable.close();
+          showImportExportToast(t("detail.exportSuccess"));
+        } catch (e) {
+          showImportExportToast(t("detail.importFail") + " (" + (e.message || String(e)) + ")", true);
+        }
+      });
+    }
+  }
 
   if (importClipboardBtn) {
     importClipboardBtn.addEventListener("click", async () => {

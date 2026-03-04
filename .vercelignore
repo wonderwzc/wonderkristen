@@ -5,3 +5,5 @@
 *.log
 .env
 .env.*
+# Olib 源码仅用于本地构建，部署只需 olib/ 构建结果
+olib-mobile-src

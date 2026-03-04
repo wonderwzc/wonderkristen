@@ -1,0 +1,21 @@
+【构建 Olib 网页版】
+- 前提：已安装 Flutter 并加入 PATH；已将 olib-mobile-main 解压到 olib-mobile-src\olib-mobile-main。
+- 执行：在项目根目录（克丽斯腾）下运行：
+  PowerShell:  Set-Location "项目路径"; .\构建Olib网页版.ps1
+  或双击：构建Olib网页版.bat
+- 结果：olib 目录下会更新 Flutter 构建产物，保留本站自定义的 olib/index.html。
+
+【生成 APK】
+- 前提：已安装 Node.js（>=18）、已执行过 npx cap add android（android 目录已存在）。
+- 执行：在项目根目录下运行：
+  npm run cap:build-apk
+  或分步：
+  1) node copy-to-www.js
+  2) npx cap sync android
+  3) cd android
+  4) gradlew.bat assembleDebug   （Windows）
+- 结果：android\app\build\outputs\apk\debug\app-debug.apk 可安装到安卓设备。
+
+【本次已执行】
+- 已执行：node copy-to-www.js、npx cap sync android；Gradle 构建（gradlew.bat assembleDebug）已在后台运行（首次会下载依赖，较慢）。
+- Olib 网页版构建未执行：本机未检测到 Flutter。安装 Flutter 后运行 构建Olib网页版.ps1 即可。

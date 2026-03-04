@@ -1,0 +1,23 @@
+# 打包 APK 时忽略，减小体积
+olib-mobile-src
+node_modules
+.git
+.vercel
+.vscode
+*.log
+.env
+.env.*
+构建Olib网页版.ps1
+构建Olib网页版.bat
+Olib融合说明.txt
+同步方案与移动端实施说明.txt
+说明.txt
+电脑上看手机效果*.txt
+进不去网站-排查.txt
+VERCEL-清单.txt
+手机同WiFi访问.ps1
+手机同WiFi访问.bat
+*.md
+.gitignore
+.vercelignore
+.capacitorignore
