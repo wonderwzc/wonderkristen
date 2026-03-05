@@ -1,0 +1,8 @@
+{
+	"appId": "site.kristen.app",
+	"appName": "克丽斯腾",
+	"webDir": "www",
+	"server": {
+		"androidScheme": "https"
+	}
+}

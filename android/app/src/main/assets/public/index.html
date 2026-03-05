@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5, user-scalable=yes">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.json">
+  <meta name="description" content="克丽斯腾·莱特个人站：角色简介、背景故事、立绘插图、文本台词、同人创作、随笔记录与书籍。">
+  <title>克丽斯腾·莱特｜个人站</title>
+  <link rel="icon" id="site-favicon" href="kw-logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="kw-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* 移动端强制可滑动：优先于外部样式，避免主界面卡死 */
+    @media (max-width: 768px) {
+      html { overflow-x: hidden !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; touch-action: pan-y !important; height: 100% !important; }
+      body { overflow-x: hidden !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; touch-action: pan-y !important; min-height: 100% !important; }
+    }
+  </style>
+  <script src="bg-music-embed.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"
+    onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.crossOrigin='anonymous';document.head.appendChild(s);"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"
+    onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';s.crossOrigin='anonymous';document.head.appendChild(s);"></script>
+</head>
+<body>
+  <a href="#main-content" class="skip-to-main" data-i18n="a11y.skipToMain">跳至主内容</a>
+  <audio id="bg-music" loop preload="metadata" aria-label="页面背景音乐"></audio>
+  <div id="starfield-overlay" class="starfield-overlay" aria-hidden="true"></div>
+  <header class="site-header">
+    <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" data-i18n-aria="a11y.openMenu" aria-label="打开菜单" aria-expanded="false" hidden>
+      <span class="mobile-menu-btn-icon" aria-hidden="true"></span>
+    </button>
+    <div class="header-galaxy-stars" id="header-galaxy-stars" aria-hidden="true"></div>
+    <div class="header-inner">
+      <div class="header-left">
+        <div class="header-title-block">
+          <div class="header-logo-wrap">
+            <img src="kw-logo.png" alt="KW 标志" class="header-logo" id="header-logo-img">
+          </div>
+          <div class="header-title-text">
+            <span class="header-tag" id="header-tag-text" data-i18n="header.tag">Rhine Lab // Director</span>
+            <div class="header-name-row">
+              <h1 id="header-name-text" data-i18n="header.name">克丽斯腾·莱特</h1>
+            </div>
+            <div class="header-subtitle-wrap">
+              <p class="header-subtitle" id="header-subtitle-text" data-i18n="header.subtitle">莱茵生命总辖</p>
+              <button type="button" class="header-name-edit-btn" id="header-name-edit-btn" data-i18n-aria="a11y.editName" data-i18n-title="a11y.editName" aria-label="更改名字" title="更改名字"><span class="header-name-edit-icon" aria-hidden="true"></span></button>
+              <div class="header-name-edit-popover" id="header-name-edit-popover" hidden role="dialog" aria-label="更改顶栏名字">
+                <label class="header-name-edit-label" for="header-edit-tag"><span data-i18n="header.editTag">上方文字</span> <input type="text" id="header-edit-tag" class="header-name-edit-input" placeholder="Rhine Lab // Director"></label>
+                <label class="header-name-edit-label" for="header-edit-name"><span data-i18n="header.editMainName">主名字</span> <input type="text" id="header-edit-name" class="header-name-edit-input" placeholder="克丽斯腾·莱特"></label>
+                <label class="header-name-edit-label" for="header-edit-subtitle"><span data-i18n="header.editSubtitle">副标题</span> <input type="text" id="header-edit-subtitle" class="header-name-edit-input" placeholder="莱茵生命总辖"></label>
+                <div class="header-name-edit-actions">
+                  <button type="button" class="header-name-edit-cancel" id="header-name-edit-cancel" data-i18n="header.cancel">取消</button>
+                  <button type="button" class="header-name-edit-save" id="header-name-edit-save" data-i18n="header.save">保存</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 导航顺序须与下方 main 内板块一致，共 9 项：角色简介→…→书籍→首屏 -->
+        <nav class="header-nav">
+          <a href="#about" class="nav-item is-active" data-target="#about" data-i18n="nav.about">角色简介</a>
+          <a href="#story" class="nav-item" data-target="#story" data-i18n="nav.story">背景故事</a>
+          <a href="#gallery" class="nav-item" data-target="#gallery" data-i18n="nav.gallery">立绘插图</a>
+          <a href="#voice" class="nav-item" data-target="#voice" data-i18n="nav.voice">文本台词</a>
+          <a href="#fanworks" class="nav-item" data-target="#fanworks" data-i18n="nav.fanworks">同人创作</a>
+          <a href="#moments" class="nav-item" data-target="#moments" data-i18n="nav.moments">随笔记录</a>
+          <a href="#references" class="nav-item" data-target="#references" data-i18n="nav.references">参考文献</a>
+          <a href="#books" class="nav-item" data-target="#books" data-i18n="nav.books">书籍</a>
+          <a href="#hero-display" class="nav-item" data-target="#hero-display" data-i18n="nav.hero">首屏</a>
+        </nav>
+      </div>
+    </div>
+    <div class="header-lang-row">
+      <button type="button" class="lang-toggle" data-i18n="a11y.langToggleBtn" data-i18n-aria="a11y.langToggle" data-i18n-title="a11y.langToggle" aria-label="切换语言：中文 ⇄ English" title="切换语言：中文 ⇄ English">中文 / English</button>
+      <button type="button" class="header-collapse-toggle" data-i18n-aria="a11y.collapseHeader" data-i18n-title="a11y.collapseHeader" aria-label="收起顶栏" title="收起顶栏">↑</button>
+      <button type="button" class="header-music-toggle" id="bg-music-toggle" data-i18n-aria="a11y.bgMusic" data-i18n-title="a11y.bgMusic" aria-label="背景音乐开关" title="背景音乐开/关"><span class="music-icon music-icon--on" aria-hidden="true">🔊</span><span class="music-icon music-icon--off" aria-hidden="true">🔇</span></button>
+    </div>
+  </header>
+
+  <section id="hero-display" class="hero-display" aria-label="首屏主视觉">
+    <div class="hero-display-inner">
+      <button type="button" class="hero-display-nav hero-display-prev" aria-label="上一张">←</button>
+      <button type="button" class="hero-display-nav hero-display-next" aria-label="下一张">→</button>
+      <div class="hero-display-content">
+        <h2 class="hero-display-title"></h2>
+        <p class="hero-display-subtitle"></p>
+        <div class="hero-display-desc"></div>
+        <a class="hero-display-link" href="#" target="_blank" rel="noopener noreferrer" style="display:none;"></a>
+      </div>
+      <div class="hero-display-visual"></div>
+    </div>
+  </section>
+  <div class="hero-collapse-bar" id="hero-collapse-bar">
+    <button type="button" class="hero-collapse-btn" id="hero-collapse-btn" data-i18n-aria="a11y.collapseHero" data-i18n-title="a11y.collapseHero" aria-label="收起首屏" title="收起首屏">
+      <span class="hero-collapse-icon" aria-hidden="true"></span>
+    </button>
+  </div>
+
+  <!-- 板块顺序与顶栏导航一致：角色简介→…→书籍→首屏（首屏图片区固定顶端，此处为入口卡片） -->
+  <main id="main-content" class="main-sections-wrap" tabindex="-1">
+    <section id="about" class="main-section" data-section="about">
+      <h2 data-i18n="section.about">角色简介</h2>
+      <p data-i18n="section.about.desc">填写角色的名字、出身、种族与阵营等基础信息，并上传头像。点击卡片可展开编辑。</p>
+    </section>
+
+    <section id="story" class="main-section" data-section="story">
+      <h2 data-i18n="section.story">背景故事</h2>
+      <p data-i18n="section.story.desc">按时间线或主题分段撰写背景故事，支持标题、创作者与简介，可上传配图。</p>
+    </section>
+
+    <section id="gallery" class="main-section" data-section="gallery">
+      <h2 data-i18n="section.gallery">立绘 / 插图</h2>
+      <p data-i18n="section.gallery.desc">上传并管理立绘、皮肤或 CG 等图片，填写标题与说明后即可在展示区浏览。</p>
+    </section>
+
+    <section id="voice" class="main-section" data-section="voice">
+      <h2 data-i18n="section.voice">文本台词</h2>
+      <p data-i18n="section.voice.desc">整理角色相关的台词与文本，按场景或触发条件分类，便于查阅与展示。</p>
+    </section>
+
+    <section id="fanworks" class="main-section" data-section="fanworks">
+      <h2 data-i18n="section.fanworks">同人创作</h2>
+      <p data-i18n="fanworks.overview">收录并展示其他创作者的二创作品。进入后可投稿、浏览展示区，或自定义版面样式。</p>
+    </section>
+
+    <section id="moments" class="main-section" data-section="moments">
+      <h2 data-i18n="section.moments">随笔记录</h2>
+      <p data-i18n="moments.overview">发布短句与灵感，类似动态。支持日期、内容与表情，可点赞与评论。</p>
+    </section>
+
+    <section id="references" class="main-section" data-section="references">
+      <h2 data-i18n="section.references">参考文献</h2>
+      <p data-i18n="references.overview">管理参考文献（Zotero 风格），支持作者、标题、年份、链接与备注，在文献检索区浏览与检索。</p>
+    </section>
+
+    <section id="books" class="main-section" data-section="books">
+      <h2 data-i18n="section.books">书籍</h2>
+      <p data-i18n="section.books.desc">管理个人书架：添加书名、作者、阅读链接与备注，支持本地收藏与跨设备同步。</p>
+    </section>
+    <section id="hero" class="main-section" data-section="hero">
+      <h2 data-i18n="section.hero">首屏</h2>
+      <p data-i18n="section.hero.desc">设置首屏主视觉图片与文案，支持多图轮播。可更换页面背景与站点图标。</p>
+      <div class="hero-section-actions">
+        <button type="button" class="hero-section-btn hero-section-btn-custom" data-i18n="hero.customArea">自定义本区域</button>
+        <label class="hero-section-btn hero-section-btn-bg" for="hero-background-input">
+          <span data-i18n="hero.changeBg">更换页面背景</span>
+          <input type="file" id="hero-background-input" class="hero-background-input" accept="image/*" aria-label="更换页面背景">
+        </label>
+        <button type="button" class="hero-section-btn hero-section-btn-restore hero-background-restore" data-i18n="hero.bgRestore">恢复默认背景</button>
+        <label class="hero-section-btn hero-section-btn-favicon" for="hero-favicon-input">
+          <span data-i18n="hero.changeFavicon">更换 Logo</span>
+          <input type="file" id="hero-favicon-input" class="hero-favicon-input" accept="image/*" aria-label="更换浏览器标签页 Logo">
+        </label>
+        <button type="button" class="hero-section-btn hero-section-btn-restore hero-favicon-restore" data-i18n="hero.faviconRestore">恢复默认 Logo</button>
+      </div>
+    </section>
+
+    <section id="detail-view" class="detail-view" hidden aria-hidden="true">
+      <div class="detail-view-cosmic" aria-hidden="true">
+        <div class="detail-view-particles"></div>
+        <div class="detail-view-glow"></div>
+      </div>
+      <div class="detail-view-pull" aria-hidden="true"></div>
+      <div class="detail-view-hole-edge" aria-hidden="true"></div>
+      <div class="detail-view-inner">
+      <div class="detail-toolbar">
+        <button type="button" class="detail-back-btn" data-i18n-title="detail.backTitle" title="返回总览（Esc）"><span class="detail-back-icon" aria-hidden="true">←</span><span class="detail-back-text" data-i18n="detail.back">返回总览</span></button>
+      </div>
+      <div class="detail-body">
+        <div class="detail-header">
+          <h2 class="detail-title" data-i18n="detail.title">板块详情</h2>
+          <p class="detail-subtitle" data-i18n="detail.subtitle">在此填写或管理本板块内容，下方为已提交的展示列表。</p>
+        </div>
+        <div class="detail-books-form" id="detail-books-form" data-detail-only-section="books" hidden>
+          <h4 class="detail-books-form-title" data-i18n="books.formTitle">添加书籍</h4>
+          <div class="detail-books-fields">
+            <label class="detail-moments-row"><span data-i18n="books.title">书名</span><input type="text" id="books-title" class="books-input books-title" placeholder="" aria-label="书名"></label>
+            <label class="detail-moments-row"><span data-i18n="books.author">作者</span><input type="text" id="books-author" class="books-input books-author" placeholder="" aria-label="作者"></label>
+            <label class="detail-moments-row"><span data-i18n="books.year">年份</span><input type="text" id="books-year" class="books-input books-year" placeholder="" maxlength="20" aria-label="年份"></label>
+            <label class="detail-moments-row"><span data-i18n="books.readLink">阅读链接</span><input type="url" id="books-url" class="books-input books-url" placeholder="" aria-label="阅读链接"></label>
+            <label class="detail-moments-row"><span data-i18n="books.note">备注</span><input type="text" id="books-note" class="books-input books-note" placeholder="" aria-label="备注"></label>
+          </div>
+          <button type="button" class="detail-submit-btn" id="books-submit-btn" data-i18n="books.addBook">添加书籍</button>
+        </div>
+        <div class="detail-refined-block">
+          <h3 class="detail-about-basic-title" data-detail-only-section="about" hidden data-i18n="section.about.basic">基础信息</h3>
+          <div class="detail-avatar-area" data-detail-optional>
+            <label class="detail-avatar-label" for="detail-avatar-input">
+              <span class="detail-avatar-text" data-i18n="detail.avatar">头像</span>
+              <input type="file" id="detail-avatar-input" class="detail-avatar-input" accept="image/*" aria-label="上传头像">
+            </label>
+            <div class="detail-avatar-preview" role="img" aria-label="头像预览">
+              <img class="detail-avatar-preview-img" alt="" src="">
+            </div>
+            <div class="detail-avatar-display-options">
+              <button type="button" class="detail-avatar-crop-btn" id="avatar-crop-btn" data-i18n="detail.avatarCrop">裁剪 / 调整显示区域</button>
+            </div>
+          </div>
+          <form class="detail-submit-form">
+            <div class="form-row form-row-about-only" data-detail-only-section="about" data-optional-row="name" hidden>
+              <label data-field="name">
+                <span data-i18n="section.about.name">名字</span>
+                <input type="text" name="aboutName" id="about-name-input" placeholder="">
+              </label>
+            </div>
+            <div class="form-row" data-detail-optional data-optional-row="title-meta">
+              <label data-field="title" for="detail-form-title">
+                <span data-i18n="form.workTitle">作品标题</span>
+                <input type="text" id="detail-form-title" name="title">
+              </label>
+              <label data-field="meta" for="detail-form-creator">
+                <span data-i18n="form.creatorMeta">创作者 / 标签</span>
+                <input type="text" id="detail-form-creator" name="creator">
+              </label>
+            </div>
+            <div class="detail-custom-fields-block" data-detail-only-section="about" hidden>
+              <h4 class="detail-custom-fields-title" data-i18n="detail.customFieldsTitle">自定义基础信息栏目（可选）</h4>
+              <p class="detail-custom-fields-hint" data-i18n="detail.customFieldsHint">可添加多个自定义栏目，不填不影响提交。</p>
+              <div class="detail-custom-fields-list"></div>
+              <button type="button" class="detail-custom-fields-add" data-i18n-aria="detail.addField" aria-label="添加栏目" data-i18n="detail.addField">+</button>
+            </div>
+            <div class="form-row">
+              <label data-field="desc" for="detail-form-desc">
+                <span data-i18n="form.desc">简介 / 描述</span>
+                <textarea id="detail-form-desc" name="desc" rows="3"></textarea>
+              </label>
+            </div>
+            <div class="form-row" data-field="file-row">
+              <label data-field="file" for="detail-file-input">
+                <span data-i18n="form.fileOptional">上传文件（可选）</span>
+                <input type="file" id="detail-file-input" name="file" class="detail-file-input" accept="image/*">
+              </label>
+            </div>
+            <button type="submit" class="detail-submit-btn" data-i18n="form.submitBtn">提交</button>
+          </form>
+          <div class="detail-moments-form" id="detail-moments-form" data-detail-only-section="moments" hidden>
+            <h4 class="detail-moments-form-title" data-i18n="moments.publish">发一条说说</h4>
+            <label class="detail-moments-row"><span data-i18n="moments.noteTitle">笔记标题（可选）</span><input type="text" id="moments-title" class="moments-title-input" data-i18n-placeholder="moments.noteTitlePh" placeholder="" maxlength="120" data-i18n-aria="moments.noteTitle" aria-label="笔记标题"></label>
+            <label class="detail-moments-row"><span data-i18n="moments.dateTime">日期时间</span><input type="datetime-local" id="moments-date" aria-label="日期时间"></label>
+            <div class="detail-moments-row">
+              <span data-i18n="moments.content">内容</span>
+              <div class="moments-rich-editor-wrap">
+                <div class="moments-rich-toolbar" role="toolbar" aria-label="格式">
+                  <button type="button" class="moments-toolbar-btn" data-cmd="bold" title="粗体" aria-label="粗体"><b>B</b></button>
+                  <button type="button" class="moments-toolbar-btn" data-cmd="italic" title="斜体" aria-label="斜体"><i>I</i></button>
+                  <button type="button" class="moments-toolbar-btn" data-cmd="underline" title="下划线" aria-label="下划线"><u>U</u></button>
+                  <button type="button" class="moments-toolbar-btn" data-cmd="insertUnorderedList" title="无序列表" aria-label="无序列表">≡</button>
+                  <button type="button" class="moments-toolbar-btn" data-cmd="insertOrderedList" title="有序列表" aria-label="有序列表">1.</button>
+                  <button type="button" class="moments-toolbar-btn" data-cmd="formatBlock" data-arg="h3" title="小标题" aria-label="小标题">H</button>
+                </div>
+                <div class="moments-rich-editor" id="moments-content-rich" contenteditable="true" role="textbox" aria-multiline="true" aria-label="笔记内容" data-placeholder="写下此刻灵感…" data-i18n="moments.contentPh"></div>
+              </div>
+            </div>
+            <div class="detail-moments-emoji-row">
+              <label for="moments-emoji-input"><span data-i18n="moments.emoji">表情</span></label>
+              <div class="moments-emoji-strip" id="moments-emoji-strip"></div>
+              <input type="text" class="moments-emoji-input" id="moments-emoji-input" placeholder="或输入" maxlength="4" aria-label="表情">
+            </div>
+            <button type="button" class="detail-submit-btn" id="moments-submit-btn" data-i18n="moments.publishBtn">发布</button>
+          </div>
+          <div class="detail-refs-form" id="detail-refs-form" data-detail-only-section="references" hidden>
+            <h4 class="detail-refs-form-title" data-i18n="refs.formTitle">添加参考文献</h4>
+            <div class="detail-refs-fields">
+              <label class="detail-moments-row"><span data-i18n="refs.author">作者</span><input type="text" id="refs-author" class="refs-input refs-author" placeholder="" aria-label="作者"></label>
+              <label class="detail-moments-row"><span data-i18n="refs.title">标题</span><input type="text" id="refs-title" class="refs-input refs-title" placeholder="" aria-label="标题"></label>
+              <label class="detail-moments-row"><span data-i18n="refs.year">年份</span><input type="text" id="refs-year" class="refs-input refs-year" placeholder="" maxlength="20" aria-label="年份"></label>
+              <label class="detail-moments-row"><span data-i18n="refs.url">链接</span><input type="url" id="refs-url" class="refs-input refs-url" placeholder="" aria-label="链接"></label>
+              <label class="detail-moments-row"><span data-i18n="refs.note">备注</span><input type="text" id="refs-note" class="refs-input refs-note" placeholder="" aria-label="备注"></label>
+            </div>
+            <button type="button" class="detail-submit-btn" id="refs-submit-btn" data-i18n="refs.addRef">添加引用</button>
+          </div>
+        </div>
+        <div class="detail-about-relations" data-detail-only-section="about" hidden>
+          <h3 class="detail-about-relations-title" data-i18n="section.about.relations">人物关系</h3>
+          <div class="detail-relations-block-desc">
+            <label class="detail-relations-desc-label" for="detail-relations-block-desc"><span data-i18n="section.about.relations.blockDesc">关系板块说明（可自定义）</span></label>
+            <textarea id="detail-relations-block-desc" name="relationsBlockDesc" class="detail-relations-block-desc-input" rows="2" placeholder="" aria-label="关系板块说明"></textarea>
+          </div>
+          <div class="detail-relations-people">
+            <div class="detail-relations-people-header">
+              <span class="detail-relations-subtitle" data-i18n="section.about.relations.people">人物列表</span>
+              <button type="button" class="detail-relations-add-person" data-i18n="section.about.relations.addPerson">添加人物</button>
+            </div>
+            <div class="detail-relations-people-list"></div>
+          </div>
+          <div class="detail-relations-links">
+            <div class="detail-relations-links-header">
+              <span class="detail-relations-subtitle" data-i18n="section.about.relations.links">关系连线</span>
+              <button type="button" class="detail-relations-add-link" data-i18n="section.about.relations.addLink">添加关系</button>
+            </div>
+            <div class="detail-relations-links-list"></div>
+          </div>
+        </div>
+        <div class="detail-display-area">
+          <div class="detail-display-title-row">
+            <h3 class="detail-display-title">我的投稿展示区</h3>
+            <div class="detail-filter-by-date-wrap">
+              <button type="button" class="detail-filter-by-date-btn" id="detail-filter-by-date-btn" aria-label="按日期查找当天发布" aria-haspopup="true" aria-expanded="false" data-i18n="detail.filterByDate">按日期查找</button>
+            </div>
+            <div class="detail-import-export-wrap">
+              <button type="button" class="detail-import-export-btn" id="detail-import-export-btn" aria-label="一键导入/导出" aria-haspopup="true" aria-expanded="false" data-i18n="detail.importExport">一键导入/导出</button>
+            </div>
+          </div>
+          <p class="detail-display-hint" data-i18n="detail.displayHint">下方展示你在本板块已提交的内容，可在此整理与装扮。</p>
+          <div class="detail-display-list"></div>
+        </div>
+      </div>
+      <button type="button" class="detail-collapse-btn" id="detail-collapse-btn" data-i18n-aria="a11y.collapseSection" data-i18n-title="a11y.collapseSection" aria-label="收起本区域" title="收起本区域">
+        <span class="detail-collapse-icon" aria-hidden="true"></span>
+      </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-galaxy-stars" id="footer-galaxy-stars" aria-hidden="true"></div>
+    <div class="footer-flex">
+      <div class="footer-links-block">
+        <ul class="footer-links-list">
+          <li><a href="https://prts.wiki" target="_blank" rel="noopener noreferrer" data-i18n="links.prts">PRTS Wiki</a></li>
+          <li><a href="https://www.bilibili.com/video/BV12m4y12726/?share_source=copy_web" target="_blank" rel="noopener noreferrer" data-i18n="links.bilibili">孤星先导PV</a></li>
+          <li><a href="https://comic.hypergryph.com/terra-historicus/comic/1421" target="_blank" rel="noopener noreferrer" data-i18n="links.rhineComic">莱茵生命漫画</a></li>
+          <li>
+            <div class="footer-theme-wrap">
+              <button type="button" class="footer-theme-trigger" id="theme-trigger-btn" aria-expanded="false" aria-haspopup="true" data-i18n="theme.trigger">界面配色</button>
+              <div class="footer-theme-panel" id="theme-panel" hidden aria-hidden="true">
+                <div class="footer-theme-list" id="theme-color-list"></div>
+                <div class="footer-theme-row footer-theme-stars-row">
+                  <span class="footer-theme-stars-label" data-i18n="theme.starsToggle">星星特效</span>
+                  <button type="button" class="footer-theme-stars-btn" id="theme-stars-toggle-btn" aria-pressed="false" data-i18n="theme.starsOff">关闭</button>
+                </div>
+                <button type="button" class="footer-theme-reset" id="theme-reset-btn" data-i18n="theme.reset">恢复默认</button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <p class="footer-credit" data-i18n="footer">自建站 · 非商用 · 所有版权归原著作权人所有</p>
+  </footer>
+
+  <!-- 移动端：左侧竖条栏抽屉（展开/收回），含导航与底栏内容 -->
+  <div class="mobile-drawer-backdrop" id="mobile-drawer-backdrop" aria-hidden="true"></div>
+  <aside class="mobile-drawer" id="mobile-drawer" aria-label="主导航与设置" aria-hidden="true">
+    <div class="mobile-drawer-inner">
+      <button type="button" class="mobile-drawer-close" id="mobile-drawer-close" data-i18n-aria="a11y.closeMenu" aria-label="关闭菜单">×</button>
+      <div class="mobile-drawer-head">
+        <img src="kw-logo.png" alt="" class="mobile-drawer-logo" id="mobile-drawer-logo">
+        <span class="mobile-drawer-tag" id="mobile-drawer-tag" data-i18n="header.tag">Rhine Lab // Director</span>
+        <h2 class="mobile-drawer-name" id="mobile-drawer-name" data-i18n="header.name">克丽斯腾·莱特</h2>
+        <p class="mobile-drawer-subtitle" id="mobile-drawer-subtitle" data-i18n="header.subtitle">莱茵生命总辖</p>
+      </div>
+      <nav class="mobile-drawer-nav" aria-label="板块导航">
+        <a href="#about" class="mobile-drawer-nav-item is-active" data-target="#about" data-icon="◇" data-i18n="nav.about">角色简介</a>
+        <a href="#story" class="mobile-drawer-nav-item" data-target="#story" data-icon="▣" data-i18n="nav.story">背景故事</a>
+        <a href="#gallery" class="mobile-drawer-nav-item" data-target="#gallery" data-icon="▢" data-i18n="nav.gallery">立绘插图</a>
+        <a href="#voice" class="mobile-drawer-nav-item" data-target="#voice" data-icon="◈" data-i18n="nav.voice">文本台词</a>
+        <a href="#fanworks" class="mobile-drawer-nav-item" data-target="#fanworks" data-icon="◆" data-i18n="nav.fanworks">同人创作</a>
+        <a href="#moments" class="mobile-drawer-nav-item" data-target="#moments" data-icon="◎" data-i18n="nav.moments">随笔记录</a>
+        <a href="#references" class="mobile-drawer-nav-item" data-target="#references" data-icon="📎" data-i18n="nav.references">参考文献</a>
+        <a href="#books" class="mobile-drawer-nav-item" data-target="#books" data-icon="▤" data-i18n="nav.books">书籍</a>
+        <a href="#hero-display" class="mobile-drawer-nav-item" data-target="#hero-display" data-icon="⌂" data-i18n="nav.hero">首屏</a>
+      </nav>
+      <div class="mobile-drawer-tools">
+        <button type="button" class="lang-toggle mobile-drawer-tool mobile-drawer-tool--icon" id="mobile-drawer-lang" data-i18n-aria="a11y.langToggle" data-i18n-title="a11y.langToggle" aria-label="切换语言：中文 ⇄ English" title="切换语言：中文 ⇄ English"><span class="mobile-drawer-tool-symbol mobile-drawer-lang-symbol" aria-hidden="true">中/EN</span></button>
+        <button type="button" class="header-collapse-toggle mobile-drawer-tool mobile-drawer-tool--icon" id="mobile-drawer-collapse" data-i18n-aria="a11y.collapseHeader" aria-label="收起顶栏"><span class="mobile-drawer-tool-symbol" aria-hidden="true">↑</span></button>
+        <button type="button" class="header-music-toggle mobile-drawer-tool mobile-drawer-tool--icon" id="mobile-drawer-music" data-i18n-aria="a11y.bgMusic" aria-label="背景音乐开关"><span class="music-icon music-icon--on" aria-hidden="true">🔊</span><span class="music-icon music-icon--off" aria-hidden="true">🔇</span></button>
+      </div>
+      <div class="mobile-drawer-footer">
+        <a href="https://prts.wiki" target="_blank" rel="noopener noreferrer" class="mobile-drawer-link" data-i18n="links.prts">PRTS Wiki</a>
+        <a href="https://www.bilibili.com/video/BV12m4y12726/?share_source=copy_web" target="_blank" rel="noopener noreferrer" class="mobile-drawer-link" data-i18n="links.bilibili">PV</a>
+        <a href="https://comic.hypergryph.com/terra-historicus/comic/1421" target="_blank" rel="noopener noreferrer" class="mobile-drawer-link" data-i18n="links.rhineComic">漫画</a>
+        <button type="button" class="mobile-drawer-theme-btn mobile-drawer-theme-btn--icon" id="mobile-drawer-theme-btn" aria-expanded="false" data-i18n-aria="a11y.theme" data-i18n-title="a11y.theme" aria-label="界面配色" title="界面配色"><span class="mobile-drawer-theme-symbol" aria-hidden="true">◐</span></button>
+        <p class="mobile-drawer-credit" data-i18n="footer">自建站 · 非商用 · 所有版权归原著作权人所有</p>
+      </div>
+    </div>
+  </aside>
+
+  <div class="detail-import-export-overlay" id="detail-import-export-overlay" hidden aria-hidden="true">
+    <div class="detail-import-export-backdrop" id="detail-import-export-backdrop"></div>
+    <div class="detail-import-export-panel" id="detail-import-export-panel">
+      <h4 class="detail-import-export-heading" data-i18n="detail.importExport">一键导入/导出</h4>
+      <p class="detail-import-export-hint" data-i18n="detail.importExportHint">复制好内容后点击「从剪贴板导入」即可导入；导出将生成当前站点信息的 PDF 文件。</p>
+      <p class="detail-import-export-sync-hint" id="detail-import-export-sync-hint" data-i18n="detail.syncHint">电脑端可绑定夸克等同步盘文件夹，数据存为 JSON 自动同步；手机端用「从文件导入」与「导出 JSON」配合同步盘手动同步。</p>
+      <div class="detail-import-export-actions">
+        <button type="button" class="detail-import-export-action" id="detail-import-clipboard-btn" data-i18n="detail.importFromClipboard">从剪贴板导入</button>
+        <label class="detail-import-export-action detail-import-export-file-label" for="detail-import-file-input">
+          <span data-i18n="detail.importFromFile">从文件导入</span>
+          <input type="file" id="detail-import-file-input" accept=".json,application/json" aria-label="从文件导入 JSON" hidden>
+        </label>
+        <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-export-json-btn" data-i18n="detail.exportJson">导出 JSON</button>
+        <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-export-pdf-a4" data-i18n="detail.exportPdfA4">导出为 PDF（多页 A4）</button>
+        <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-export-pdf-long" data-i18n="detail.exportPdfLong">导出为 PDF（单页长图）</button>
+      </div>
+      <div class="detail-import-export-sync-wrap" id="detail-import-export-sync-wrap" hidden>
+        <p class="detail-import-export-sync-title" data-i18n="detail.syncFolderTitle">同步盘（电脑端）</p>
+        <div class="detail-import-export-actions">
+          <button type="button" class="detail-import-export-action" id="detail-sync-pick-dir-btn" data-i18n="detail.syncPickFolder">选择同步文件夹</button>
+          <button type="button" class="detail-import-export-action" id="detail-sync-read-btn" data-i18n="detail.syncRead">从同步文件夹读取</button>
+          <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-sync-write-btn" data-i18n="detail.syncSave">保存到同步文件夹</button>
+        </div>
+      </div>
+      <p class="detail-import-export-toast" id="detail-import-export-toast" aria-live="polite" hidden></p>
+    </div>
+  </div>
+
+  <div class="detail-filter-by-date-overlay" id="detail-filter-by-date-overlay" hidden aria-hidden="true">
+    <div class="detail-filter-by-date-overlay-backdrop" id="detail-filter-by-date-backdrop"></div>
+    <div class="detail-filter-by-date-dropdown" id="detail-filter-by-date-dropdown">
+      <h4 class="detail-filter-by-date-heading" data-i18n="detail.filterByDate">按日期查找</h4>
+      <label class="detail-filter-by-date-label"><span data-i18n="detail.pickDate">选择日期</span><input type="date" id="detail-filter-date-input" aria-label="选择日期"></label>
+      <label class="detail-filter-by-date-label"><span data-i18n="detail.pickMonth">选择月份（按当月）</span><input type="month" id="detail-filter-month-input" aria-label="选择月份"></label>
+      <p class="detail-filter-by-date-hint" id="detail-filter-by-date-hint" data-i18n="detail.filterByDateHint">仅说说动态支持按日期/当月筛选发布内容。</p>
+      <div class="detail-filter-by-date-actions">
+        <button type="button" class="detail-filter-by-date-apply" id="detail-filter-by-date-apply" data-i18n="detail.filterApplyDay">查找当天</button>
+        <button type="button" class="detail-filter-by-date-apply-month" id="detail-filter-by-date-apply-month" data-i18n="detail.filterApplyMonth">查找当月</button>
+        <button type="button" class="detail-filter-by-date-clear" id="detail-filter-by-date-clear" data-i18n="detail.filterClear">清除筛选</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="avatar-crop-overlay" id="avatar-crop-overlay" hidden aria-hidden="true">
+    <div class="avatar-crop-backdrop"></div>
+    <div class="avatar-crop-panel">
+      <h3 class="avatar-crop-title">调整头像显示区域</h3>
+      <p class="avatar-crop-hint">在图片框内拖拽可移动位置，滚轮可缩放；也可用下方滑块微调。</p>
+      <div class="avatar-crop-frame" id="avatar-crop-frame">
+        <img class="avatar-crop-img" id="avatar-crop-img" alt="">
+      </div>
+      <div class="avatar-crop-controls">
+        <label class="avatar-crop-slider-label"><span>水平位置</span><input type="range" class="avatar-crop-slider" id="avatar-crop-x" min="0" max="100" value="50"></label>
+        <label class="avatar-crop-slider-label"><span>垂直位置</span><input type="range" class="avatar-crop-slider" id="avatar-crop-y" min="0" max="100" value="50"></label>
+        <label class="avatar-crop-slider-label"><span>缩放</span><input type="range" class="avatar-crop-slider" id="avatar-crop-scale" min="50" max="200" value="100"></label>
+      </div>
+      <div class="avatar-crop-actions">
+        <button type="button" class="avatar-crop-done" id="avatar-crop-done">完成</button>
+        <button type="button" class="avatar-crop-cancel" id="avatar-crop-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-card-expand-overlay" id="profile-card-expand" hidden aria-hidden="true">
+    <div class="profile-card-expand-backdrop"></div>
+    <div class="profile-card-expand-panel">
+      <div class="profile-card-expand-inner">
+        <div class="profile-card-expand-thumb-wrap">
+          <div class="profile-card-expand-thumb">
+            <img class="profile-card-expand-img" alt="" src="">
+          </div>
+          <div class="profile-card-expand-avatar-upload">
+            <label class="profile-card-expand-avatar-label" for="expand-avatar-file">
+              <span class="profile-card-expand-avatar-btn-text">更换头像</span>
+              <input type="file" class="profile-card-expand-file" id="expand-avatar-file" accept="image/*">
+            </label>
+          </div>
+        </div>
+        <div class="profile-card-expand-body">
+          <h3 class="profile-card-expand-title">资料详情</h3>
+          <div class="profile-card-expand-form">
+            <label><span class="profile-card-expand-label">名字</span><input type="text" class="profile-card-expand-input" id="expand-name"></label>
+            <label><span class="profile-card-expand-label">出身 / 出生地</span><input type="text" class="profile-card-expand-input" id="expand-title"></label>
+            <label><span class="profile-card-expand-label">种族 / 所属阵营</span><input type="text" class="profile-card-expand-input" id="expand-meta"></label>
+            <label><span class="profile-card-expand-label">身份与角色简介</span><textarea class="profile-card-expand-input profile-card-expand-textarea" id="expand-desc" rows="4"></textarea></label>
+            <div class="profile-card-expand-custom-block">
+              <h4 class="profile-card-expand-custom-title">自定义基础信息栏目（可选）</h4>
+              <p class="profile-card-expand-custom-hint">可在此添加、修改栏目并填写本卡内容，随时更改。</p>
+              <div class="profile-card-expand-custom-list" id="expand-custom-fields-list"></div>
+              <button type="button" class="profile-card-expand-custom-add" id="expand-custom-fields-add" aria-label="添加栏目">+</button>
+            </div>
+          </div>
+          <div class="profile-card-expand-actions">
+            <button type="button" class="profile-card-expand-save">保存</button>
+            <button type="button" class="profile-card-expand-close">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="back-to-top-btn" id="back-to-top-btn" aria-label="回到顶部" title="回到顶部" hidden>
+    <svg class="back-to-top-rocket" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 1L8 9h8L12 1z"/>
+      <path d="M12 9v11"/>
+      <path d="M8 20l4 7 4-7"/>
+      <path d="M9 16l3-1.5 3 1.5"/>
+    </svg>
+  </button>
+  <button type="button" class="go-to-bottom-btn" id="go-to-bottom-btn" aria-label="马上到底部" title="马上到底部" hidden>
+    <svg class="go-to-bottom-arrow" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 27L8 19h8L12 27z"/>
+      <path d="M12 19V8"/>
+      <path d="M8 8l4 7 4-7"/>
+      <path d="M9 12l3 1.5 3-1.5"/>
+    </svg>
+  </button>
+
+  <script>
+    (function(){
+      if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches) {
+        var style = document.createElement('style');
+        style.textContent = 'html,body{overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important}';
+        document.head.appendChild(style);
+        document.documentElement.style.overflowY = 'auto';
+        document.body.style.overflowY = 'auto';
+      }
+    })();
+  </script>
+  <script src="script.js"></script>
+</body>
+</html>

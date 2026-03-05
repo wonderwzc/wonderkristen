@@ -1,0 +1,25 @@
+{
+  "name": "christen-site",
+  "private": true,
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node -e \"process.exit(0)\"",
+    "start": "npx serve .. -l 3849",
+    "cap:init": "cap add android",
+    "cap:sync": "cap sync android",
+    "cap:android": "cap open android",
+    "cap:copy": "node ../scripts/copy-to-www.js",
+    "cap:build-apk": "node ../scripts/copy-to-www.js && npx cap sync android && cd ../android && gradlew.bat assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "capacitor": {
+    "platforms": ["android"]
+  }
+}
