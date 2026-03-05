@@ -2,21 +2,33 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5, user-scalable=yes">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="config/manifest.json">
   <meta name="description" content="克丽斯腾·莱特个人站：角色简介、背景故事、立绘插图、文本台词、同人创作、随笔记录与书籍。">
   <title>克丽斯腾·莱特｜个人站</title>
-  <link rel="icon" id="site-favicon" href="kw-logo.png" type="image/png">
-  <link rel="apple-touch-icon" href="kw-logo.png">
+  <link rel="icon" id="site-favicon" href="assets/kw-logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/kw-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script src="bg-music-embed.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* 移动端/窄视口：强制可滑动，避免鼠标滚轮与触摸失效；不设 html height:100% 以免阻断页面滚动 */
+    @media (max-width: 768px) {
+      html { overflow-x: hidden !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; touch-action: pan-y !important; min-height: 100% !important; }
+      body { overflow-x: hidden !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important; touch-action: pan-y !important; min-height: 100vh !important; min-height: 100dvh !important; }
+    }
+  </style>
+  <script src="js/bg-music-embed.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"
+    onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';s.crossOrigin='anonymous';document.head.appendChild(s);"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"
+    onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';s.crossOrigin='anonymous';document.head.appendChild(s);"></script>
 </head>
 <body>
   <a href="#main-content" class="skip-to-main" data-i18n="a11y.skipToMain">跳至主内容</a>
@@ -31,7 +43,7 @@
       <div class="header-left">
         <div class="header-title-block">
           <div class="header-logo-wrap">
-            <img src="kw-logo.png" alt="KW 标志" class="header-logo" id="header-logo-img">
+            <img src="assets/kw-logo.png" alt="KW 标志" class="header-logo" id="header-logo-img">
           </div>
           <div class="header-title-text">
             <span class="header-tag" id="header-tag-text" data-i18n="header.tag">Rhine Lab // Director</span>
@@ -42,9 +54,9 @@
               <p class="header-subtitle" id="header-subtitle-text" data-i18n="header.subtitle">莱茵生命总辖</p>
               <button type="button" class="header-name-edit-btn" id="header-name-edit-btn" data-i18n-aria="a11y.editName" data-i18n-title="a11y.editName" aria-label="更改名字" title="更改名字"><span class="header-name-edit-icon" aria-hidden="true"></span></button>
               <div class="header-name-edit-popover" id="header-name-edit-popover" hidden role="dialog" aria-label="更改顶栏名字">
-                <label class="header-name-edit-label"><span data-i18n="header.editTag">上方文字</span> <input type="text" id="header-edit-tag" class="header-name-edit-input" placeholder="Rhine Lab // Director"></label>
-                <label class="header-name-edit-label"><span data-i18n="header.editMainName">主名字</span> <input type="text" id="header-edit-name" class="header-name-edit-input" placeholder="克丽斯腾·莱特"></label>
-                <label class="header-name-edit-label"><span data-i18n="header.editSubtitle">副标题</span> <input type="text" id="header-edit-subtitle" class="header-name-edit-input" placeholder="莱茵生命总辖"></label>
+                <label class="header-name-edit-label" for="header-edit-tag"><span data-i18n="header.editTag">上方文字</span> <input type="text" id="header-edit-tag" class="header-name-edit-input" placeholder="Rhine Lab // Director"></label>
+                <label class="header-name-edit-label" for="header-edit-name"><span data-i18n="header.editMainName">主名字</span> <input type="text" id="header-edit-name" class="header-name-edit-input" placeholder="克丽斯腾·莱特"></label>
+                <label class="header-name-edit-label" for="header-edit-subtitle"><span data-i18n="header.editSubtitle">副标题</span> <input type="text" id="header-edit-subtitle" class="header-name-edit-input" placeholder="莱茵生命总辖"></label>
                 <div class="header-name-edit-actions">
                   <button type="button" class="header-name-edit-cancel" id="header-name-edit-cancel" data-i18n="header.cancel">取消</button>
                   <button type="button" class="header-name-edit-save" id="header-name-edit-save" data-i18n="header.save">保存</button>
@@ -132,21 +144,21 @@
 
     <section id="books" class="main-section" data-section="books">
       <h2 data-i18n="section.books">书籍</h2>
-      <p data-i18n="section.books.desc">集成 Olib 电子书：搜索、在线阅读与收藏，支持多线路访问。</p>
+      <p data-i18n="section.books.desc">管理个人书架：添加书名、作者、阅读链接与备注，支持本地收藏与跨设备同步。</p>
     </section>
     <section id="hero" class="main-section" data-section="hero">
       <h2 data-i18n="section.hero">首屏</h2>
       <p data-i18n="section.hero.desc">设置首屏主视觉图片与文案，支持多图轮播。可更换页面背景与站点图标。</p>
       <div class="hero-section-actions">
         <button type="button" class="hero-section-btn hero-section-btn-custom" data-i18n="hero.customArea">自定义本区域</button>
-        <label class="hero-section-btn hero-section-btn-bg">
+        <label class="hero-section-btn hero-section-btn-bg" for="hero-background-input">
           <span data-i18n="hero.changeBg">更换页面背景</span>
-          <input type="file" class="hero-background-input" accept="image/*" aria-label="更换页面背景">
+          <input type="file" id="hero-background-input" class="hero-background-input" accept="image/*" aria-label="更换页面背景">
         </label>
         <button type="button" class="hero-section-btn hero-section-btn-restore hero-background-restore" data-i18n="hero.bgRestore">恢复默认背景</button>
-        <label class="hero-section-btn hero-section-btn-favicon">
+        <label class="hero-section-btn hero-section-btn-favicon" for="hero-favicon-input">
           <span data-i18n="hero.changeFavicon">更换 Logo</span>
-          <input type="file" class="hero-favicon-input" accept="image/*" aria-label="更换浏览器标签页 Logo">
+          <input type="file" id="hero-favicon-input" class="hero-favicon-input" accept="image/*" aria-label="更换浏览器标签页 Logo">
         </label>
         <button type="button" class="hero-section-btn hero-section-btn-restore hero-favicon-restore" data-i18n="hero.faviconRestore">恢复默认 Logo</button>
       </div>
@@ -168,23 +180,23 @@
           <h2 class="detail-title" data-i18n="detail.title">板块详情</h2>
           <p class="detail-subtitle" data-i18n="detail.subtitle">在此填写或管理本板块内容，下方为已提交的展示列表。</p>
         </div>
-        <div class="detail-books-wrap" id="detail-books-wrap" hidden aria-hidden="true">
-          <div class="detail-books-bar">
-            <a class="detail-books-open-new" id="detail-books-open-new" href="olib/index.html" target="_blank" rel="noopener noreferrer" data-i18n="books.openInNew">在新页面打开 Olib</a>
-            <span class="detail-books-hint" data-i18n="books.hint">需通过已部署网址访问（如 Vercel），勿直接打开本地 HTML 文件。</span>
+        <div class="detail-books-form" id="detail-books-form" data-detail-only-section="books" hidden>
+          <h4 class="detail-books-form-title" data-i18n="books.formTitle">添加书籍</h4>
+          <div class="detail-books-fields">
+            <label class="detail-moments-row"><span data-i18n="books.title">书名</span><input type="text" id="books-title" class="books-input books-title" placeholder="" aria-label="书名"></label>
+            <label class="detail-moments-row"><span data-i18n="books.author">作者</span><input type="text" id="books-author" class="books-input books-author" placeholder="" aria-label="作者"></label>
+            <label class="detail-moments-row"><span data-i18n="books.year">年份</span><input type="text" id="books-year" class="books-input books-year" placeholder="" maxlength="20" aria-label="年份"></label>
+            <label class="detail-moments-row"><span data-i18n="books.readLink">阅读链接</span><input type="url" id="books-url" class="books-input books-url" placeholder="" aria-label="阅读链接"></label>
+            <label class="detail-moments-row"><span data-i18n="books.note">备注</span><input type="text" id="books-note" class="books-input books-note" placeholder="" aria-label="备注"></label>
           </div>
-          <div class="detail-books-loading" id="detail-books-loading">正在加载 Olib 电子书…</div>
-          <iframe class="detail-books-iframe" id="detail-books-iframe" title="Olib 电子书"></iframe>
-          <div class="detail-books-fallback" id="detail-books-fallback" hidden aria-hidden="true">
-            <p class="detail-books-fallback-msg" data-i18n="books.noFlutter">当前未配置 Olib 电子书，本站其他板块可正常使用。若需书籍功能，请按「Olib融合说明」构建 Olib 网页版（需 Flutter），或直接使用已部署站点。</p>
-          </div>
+          <button type="button" class="detail-submit-btn" id="books-submit-btn" data-i18n="books.addBook">添加书籍</button>
         </div>
         <div class="detail-refined-block">
           <h3 class="detail-about-basic-title" data-detail-only-section="about" hidden data-i18n="section.about.basic">基础信息</h3>
           <div class="detail-avatar-area" data-detail-optional>
-            <label class="detail-avatar-label">
+            <label class="detail-avatar-label" for="detail-avatar-input">
               <span class="detail-avatar-text" data-i18n="detail.avatar">头像</span>
-              <input type="file" class="detail-avatar-input" accept="image/*" aria-label="上传头像">
+              <input type="file" id="detail-avatar-input" class="detail-avatar-input" accept="image/*" aria-label="上传头像">
             </label>
             <div class="detail-avatar-preview" role="img" aria-label="头像预览">
               <img class="detail-avatar-preview-img" alt="" src="">
@@ -201,13 +213,13 @@
               </label>
             </div>
             <div class="form-row" data-detail-optional data-optional-row="title-meta">
-              <label data-field="title">
+              <label data-field="title" for="detail-form-title">
                 <span data-i18n="form.workTitle">作品标题</span>
-                <input type="text" name="title">
+                <input type="text" id="detail-form-title" name="title">
               </label>
-              <label data-field="meta">
+              <label data-field="meta" for="detail-form-creator">
                 <span data-i18n="form.creatorMeta">创作者 / 标签</span>
-                <input type="text" name="creator">
+                <input type="text" id="detail-form-creator" name="creator">
               </label>
             </div>
             <div class="detail-custom-fields-block" data-detail-only-section="about" hidden>
@@ -217,15 +229,15 @@
               <button type="button" class="detail-custom-fields-add" data-i18n-aria="detail.addField" aria-label="添加栏目" data-i18n="detail.addField">+</button>
             </div>
             <div class="form-row">
-              <label data-field="desc">
+              <label data-field="desc" for="detail-form-desc">
                 <span data-i18n="form.desc">简介 / 描述</span>
-                <textarea name="desc" rows="3"></textarea>
+                <textarea id="detail-form-desc" name="desc" rows="3"></textarea>
               </label>
             </div>
             <div class="form-row" data-field="file-row">
-              <label data-field="file">
+              <label data-field="file" for="detail-file-input">
                 <span data-i18n="form.fileOptional">上传文件（可选）</span>
-                <input type="file" name="file" class="detail-file-input" accept="image/*">
+                <input type="file" id="detail-file-input" name="file" class="detail-file-input" accept="image/*">
               </label>
             </div>
             <button type="submit" class="detail-submit-btn" data-i18n="form.submitBtn">提交</button>
@@ -249,7 +261,7 @@
               </div>
             </div>
             <div class="detail-moments-emoji-row">
-              <span data-i18n="moments.emoji">表情</span>
+              <label for="moments-emoji-input"><span data-i18n="moments.emoji">表情</span></label>
               <div class="moments-emoji-strip" id="moments-emoji-strip"></div>
               <input type="text" class="moments-emoji-input" id="moments-emoji-input" placeholder="或输入" maxlength="4" aria-label="表情">
             </div>
@@ -270,8 +282,8 @@
         <div class="detail-about-relations" data-detail-only-section="about" hidden>
           <h3 class="detail-about-relations-title" data-i18n="section.about.relations">人物关系</h3>
           <div class="detail-relations-block-desc">
-            <label class="detail-relations-desc-label"><span data-i18n="section.about.relations.blockDesc">关系板块说明（可自定义）</span></label>
-            <textarea class="detail-relations-block-desc-input" rows="2" placeholder=""></textarea>
+            <label class="detail-relations-desc-label" for="detail-relations-block-desc"><span data-i18n="section.about.relations.blockDesc">关系板块说明（可自定义）</span></label>
+            <textarea id="detail-relations-block-desc" name="relationsBlockDesc" class="detail-relations-block-desc-input" rows="2" placeholder="" aria-label="关系板块说明"></textarea>
           </div>
           <div class="detail-relations-people">
             <div class="detail-relations-people-header">
@@ -342,7 +354,7 @@
     <div class="mobile-drawer-inner">
       <button type="button" class="mobile-drawer-close" id="mobile-drawer-close" data-i18n-aria="a11y.closeMenu" aria-label="关闭菜单">×</button>
       <div class="mobile-drawer-head">
-        <img src="kw-logo.png" alt="" class="mobile-drawer-logo" id="mobile-drawer-logo">
+        <img src="assets/kw-logo.png" alt="" class="mobile-drawer-logo" id="mobile-drawer-logo">
         <span class="mobile-drawer-tag" id="mobile-drawer-tag" data-i18n="header.tag">Rhine Lab // Director</span>
         <h2 class="mobile-drawer-name" id="mobile-drawer-name" data-i18n="header.name">克丽斯腾·莱特</h2>
         <p class="mobile-drawer-subtitle" id="mobile-drawer-subtitle" data-i18n="header.subtitle">莱茵生命总辖</p>
@@ -381,7 +393,7 @@
       <p class="detail-import-export-sync-hint" id="detail-import-export-sync-hint" data-i18n="detail.syncHint">电脑端可绑定夸克等同步盘文件夹，数据存为 JSON 自动同步；手机端用「从文件导入」与「导出 JSON」配合同步盘手动同步。</p>
       <div class="detail-import-export-actions">
         <button type="button" class="detail-import-export-action" id="detail-import-clipboard-btn" data-i18n="detail.importFromClipboard">从剪贴板导入</button>
-        <label class="detail-import-export-action detail-import-export-file-label">
+        <label class="detail-import-export-action detail-import-export-file-label" for="detail-import-file-input">
           <span data-i18n="detail.importFromFile">从文件导入</span>
           <input type="file" id="detail-import-file-input" accept=".json,application/json" aria-label="从文件导入 JSON" hidden>
         </label>
@@ -390,11 +402,12 @@
         <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-export-pdf-long" data-i18n="detail.exportPdfLong">导出为 PDF（单页长图）</button>
       </div>
       <div class="detail-import-export-sync-wrap" id="detail-import-export-sync-wrap" hidden>
-        <p class="detail-import-export-sync-title" data-i18n="detail.syncFolderTitle">同步盘（电脑端）</p>
+        <p class="detail-import-export-sync-title" data-i18n="detail.syncFolderTitle">同步根目录（电脑端）</p>
+        <p class="detail-import-export-sync-structure" id="detail-sync-structure-hint" aria-live="polite">选择根目录后，将自动创建各板块的中文名称子文件夹，每夹内仅存 data.json，编辑后自动同步。</p>
         <div class="detail-import-export-actions">
-          <button type="button" class="detail-import-export-action" id="detail-sync-pick-dir-btn" data-i18n="detail.syncPickFolder">选择同步文件夹</button>
-          <button type="button" class="detail-import-export-action" id="detail-sync-read-btn" data-i18n="detail.syncRead">从同步文件夹读取</button>
-          <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-sync-write-btn" data-i18n="detail.syncSave">保存到同步文件夹</button>
+          <button type="button" class="detail-import-export-action" id="detail-sync-pick-dir-btn" data-i18n="detail.syncPickFolder">选择同步根目录</button>
+          <button type="button" class="detail-import-export-action" id="detail-sync-read-btn" data-i18n="detail.syncRead">从同步根目录读取</button>
+          <button type="button" class="detail-import-export-action detail-import-export-export-btn" id="detail-sync-write-btn" data-i18n="detail.syncSave">保存到同步根目录</button>
         </div>
       </div>
       <p class="detail-import-export-toast" id="detail-import-export-toast" aria-live="polite" hidden></p>
@@ -445,7 +458,7 @@
             <img class="profile-card-expand-img" alt="" src="">
           </div>
           <div class="profile-card-expand-avatar-upload">
-            <label class="profile-card-expand-avatar-label">
+            <label class="profile-card-expand-avatar-label" for="expand-avatar-file">
               <span class="profile-card-expand-avatar-btn-text">更换头像</span>
               <input type="file" class="profile-card-expand-file" id="expand-avatar-file" accept="image/*">
             </label>
@@ -491,6 +504,17 @@
     </svg>
   </button>
 
-  <script src="script.js"></script>
+  <script>
+    (function(){
+      if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches) {
+        var style = document.createElement('style');
+        style.textContent = 'html,body{overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important}';
+        document.head.appendChild(style);
+        document.documentElement.style.overflowY = 'auto';
+        document.body.style.overflowY = 'auto';
+      }
+    })();
+  </script>
+  <script src="js/script.js"></script>
 </body>
 </html>
